@@ -1,87 +1,67 @@
 TriLingua Bridge
 
-An AI language learning tool for:
-1. Chinese speakers learning Korean
-2. Korean speakers learning Chinese
-3. Chinese and Korean speakers learning English together
+Learn Chinese, Korean, and English with AI.
 
-New in this version
-- AI Chat Reply Assistant:
-  - Input a Korean/Chinese/English message
-  - Get translation, key vocabulary, and three reply styles (natural, polite, casual)
-- User Account Isolation (username-based)
-  - Add username login (no password)
-  - Every history insert and query is filtered by username
-  - Users only see their own data
-- Learning History page
-  - Shows previous conversations, timestamps, and language pairs
-- Improved UI
-  - Sidebar navigation
-  - Clean card-style sections
-  - Better spacing and mobile-friendly
+What’s new
+- Trilingual learner directions
+  - Chinese speakers learning Korean or English
+  - Korean speakers learning Chinese or English
+  - English speakers learning Chinese or Korean
+  - Choose both “My native language” and “I want to learn” for every AI feature
+- Full UI localization
+  - Interface language selector: English / 简体中文 / 한국어
+  - All titles, labels, buttons, navigation, and result headings localize automatically
+- Per-user data isolation (username)
+  - Every insert and query is filtered by username
+  - New fields native_lang and ui_lang recorded with each history entry
+- Modern UI
+  - Soft background, rounded colorful cards, mobile-friendly
+  - Attractive Home with feature cards
 
 Features
-- Text translation between Chinese, Korean, and English
+- AI Chat Reply Assistant (translate, key vocab, natural/polite/casual replies)
+- Translation (Chinese/Korean/English)
 - Grammar correction
 - Natural expression suggestions
 - Vocabulary explanation
 - Tone analysis (polite, casual, formal)
-- Learning history stored in SQLite
-- Simple, clean UI built with Streamlit
+- Learning history in SQLite (user-isolated)
 
 Tech Stack
-- Python
-- Streamlit
-- OpenAI API
-- SQLite (learning history)
-- dotenv for configuration
+- Python + Streamlit
+- OpenAI API (no hardcoded keys; uses environment)
+- SQLite (default) or adapt db helper for MySQL
+- python-dotenv for configuration
 
 Project Structure
-- app.py (Streamlit app)
+- app.py (Streamlit app with UI localization)
 - helpers/
-  - ai_helper.py (OpenAI prompts and calls)
-  - db.py (SQLite helper with username isolation)
-  - __init__.py
+  - ai_helper.py (model prompts/calls)
+  - db.py (SQLite helper with username isolation + native/ui language columns)
 - requirements.txt
 - .env.example
 - README.md
 
 Setup
-1) Clone the repo
-   git clone https://github.com/yourname/trilingua-bridge.git
-   cd trilingua-bridge
-
-2) Create and activate a virtual environment (recommended)
+1) Create virtualenv and install
    python -m venv .venv
-   source .venv/bin/activate          # macOS/Linux
-   .venv\Scripts\activate             # Windows
-
-3) Install dependencies
+   source .venv/bin/activate  # macOS/Linux
+   .venv\\Scripts\\activate   # Windows
    pip install -r requirements.txt
 
-4) Configure environment variables
+2) Configure environment
    - Copy .env.example to .env
-   - Set OPENAI_API_KEY in .env
-   - Optionally set OPENAI_MODEL and DB_PATH
+   - Set OPENAI_API_KEY
+   - Optional: OPENAI_MODEL (default gpt-4o-mini), DB_PATH
 
-   Example:
-   OPENAI_API_KEY=sk-xxxx
-   OPENAI_MODEL=gpt-4o-mini
-   DB_PATH=trilingua.db
-
-5) Run the app
+3) Run
    streamlit run app.py
 
 Notes
-- No API keys are hardcoded. The app reads OPENAI_API_KEY from environment.
-- The history database schema includes a username column. All inserts and queries require a username.
-- The DB init function auto-migrates older databases by adding the username column if missing.
-- To reset history, delete the DB file specified by DB_PATH.
-
-Troubleshooting
-- If the OpenAI call fails, confirm OPENAI_API_KEY is set and valid.
-- If you see import errors, ensure your virtual environment is active and requirements are installed.
-- If Streamlit cannot start, ensure the port is free or set STREAMLIT_SERVER_PORT.
+- UI language only changes the interface; it does not force the study languages (select those in sidebar).
+- All history queries include username filtering to ensure account isolation.
+- The DB helper auto-migrates older databases to include username/native_lang/ui_lang columns.
+- To reset data, delete the DB file specified by DB_PATH.
 
 License
-- For educational/demo purposes. Adapt as needed for production.
+- Educational/demo. Adapt for production (auth, rate limits, error handling, etc.).

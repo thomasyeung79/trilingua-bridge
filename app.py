@@ -491,8 +491,22 @@ PAGE_DEFS: List[Tuple[str, str, str]] = [
 ]
 labels = [lbl for _, _, lbl in PAGE_DEFS]
 label_to_page = {lbl: pid for pid, _, lbl in PAGE_DEFS}
-current_label = st.sidebar.radio("Go to", labels, index=0, key="nav_value")
+if "page" not in st.session_state:
+    st.session_state["page"] = "Home"
+
+current_label = st.sidebar.radio(
+    "Go to",
+    labels,
+    index=labels.index(
+        next(lbl for pid, _, lbl in PAGE_DEFS if pid == st.session_state["page"])
+    ),
+    key="nav_value"
+)
+
 current_page = label_to_page[current_label]
+
+# 同步 sidebar 和 page
+st.session_state["page"] = current_page
 
 st.sidebar.info(t("tip"))
 
@@ -505,25 +519,25 @@ if current_page == "Home":
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        feature_button("💬", t("feature_chat_title"), t("feature_chat_desc"), t("nav_chat"), "fc_chat")
+        feature_button("💬", t("feature_chat_title"), t("feature_chat_desc"), "Chat", "fc_chat")
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        feature_button("🌐", t("feature_translation_title"), t("feature_translation_desc"), t("nav_translate"), "fc_translation")
+        feature_button("🌐", t("feature_translation_title"), t("feature_translation_desc"), "Translate", "fc_translation")
         st.markdown('</div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        feature_button("✍️", t("feature_grammar_title"), t("feature_grammar_desc"), t("nav_grammar"), "fc_grammar")
+        feature_button("✍️", t("feature_grammar_title"), t("feature_grammar_desc"), "Grammar", "fc_grammar")
         st.markdown('</div>', unsafe_allow_html=True)
 
     c4, c5, _ = st.columns(3)
     with c4:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        feature_button("🎯", t("feature_natural_title"), t("feature_natural_desc"), t("nav_natural"), "fc_natural")
+        feature_button("🎯", t("feature_natural_title"), t("feature_natural_desc"), "Natural", "fc_natural")
         st.markdown('</div>', unsafe_allow_html=True)
     with c5:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        feature_button("🕘", t("feature_history_title"), t("feature_history_desc"), t("nav_history"), "fc_history")
+        feature_button("🕘", t("feature_history_title"), t("feature_history_desc"), "History", "fc_history")
         st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 

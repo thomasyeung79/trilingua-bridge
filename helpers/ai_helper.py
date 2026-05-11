@@ -1,7 +1,7 @@
 import os
 import json
 import time
-from typing import Dict, Tuple, Any, List
+from typing import Dict, Tuple, Any
 from openai import OpenAI
 
 MODEL_DEFAULT = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -111,10 +111,10 @@ def analyze_tone(text: str, lang: str, native_lang: str):
     system = (
         f"You are a {ln} tone analyst. The learner's native language is {native}. "
         "Classify tone as one of: polite, casual, formal. "
-        "Provide:\n"
-        "1) Detected tone label\n"
-        "2) One-sentence reason in the learner's native language\n"
-        "3) Rewrites of the same content in {ln} for: more polite, more neutral, more casual, more formal."
+        f"Provide:\n"
+        f"1) Detected tone label\n"
+        f"2) One-sentence reason in the learner's native language\n"
+        f"3) Rewrites of the same content in {ln} for: more polite, more neutral, more casual, more formal."
     )
     user = f"Language: {ln}\nText:\n{text}"
     return _chat([
@@ -178,15 +178,11 @@ def chat_reply_assistant(
         {"role": "user", "content": user},
     ], temperature=temperature)
 
-    # Try parse JSON
-    result: Dict[str, Any] = {}
     try:
         result = json.loads(content)
-        # Ensure vocabulary is list
         if not isinstance(result.get("vocabulary", []), list):
             result["vocabulary"] = []
     except Exception:
-        # Fallback minimal result
         result = {
             "detected_source_lang": source_lang if source_lang != "auto" else None,
             "translation": content,

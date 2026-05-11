@@ -5,6 +5,21 @@ An AI language learning tool for:
 2. Korean speakers learning Chinese
 3. Chinese and Korean speakers learning English together
 
+New in this version
+- AI Chat Reply Assistant:
+  - Input a Korean/Chinese/English message
+  - Get translation, key vocabulary, and three reply styles (natural, polite, casual)
+- User Account Isolation (username-based)
+  - Add username login (no password)
+  - Every history insert and query is filtered by username
+  - Users only see their own data
+- Learning History page
+  - Shows previous conversations, timestamps, and language pairs
+- Improved UI
+  - Sidebar navigation
+  - Clean card-style sections
+  - Better spacing and mobile-friendly
+
 Features
 - Text translation between Chinese, Korean, and English
 - Grammar correction
@@ -25,7 +40,7 @@ Project Structure
 - app.py (Streamlit app)
 - helpers/
   - ai_helper.py (OpenAI prompts and calls)
-  - db.py (SQLite helper)
+  - db.py (SQLite helper with username isolation)
   - __init__.py
 - requirements.txt
 - .env.example
@@ -59,13 +74,13 @@ Setup
 
 Notes
 - No API keys are hardcoded. The app reads OPENAI_API_KEY from environment.
-- The history database file defaults to trilingua.db in the project root.
-- The app tailors explanations to the user's native language while examples and rewrites use the target language.
-- If you see import errors, ensure your virtual environment is active and requirements are installed.
+- The history database schema includes a username column. All inserts and queries require a username.
+- The DB init function auto-migrates older databases by adding the username column if missing.
+- To reset history, delete the DB file specified by DB_PATH.
 
 Troubleshooting
 - If the OpenAI call fails, confirm OPENAI_API_KEY is set and valid.
-- Delete trilingua.db to reset history (this will erase all saved records).
+- If you see import errors, ensure your virtual environment is active and requirements are installed.
 - If Streamlit cannot start, ensure the port is free or set STREAMLIT_SERVER_PORT.
 
 License

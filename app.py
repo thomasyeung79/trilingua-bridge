@@ -397,7 +397,7 @@ def feature_button(icon: str, title: str, desc: str, target_label: str, key: str
     )
     if clicked:
         st.session_state["nav_value"] = target_label
-        st.experimental_rerun()
+        st.rerun()
 
 def now_ms() -> int:
     return int(time.time() * 1000)
@@ -435,7 +435,7 @@ def require_login() -> str:
         st.sidebar.success(f"{t('username')}: {st.session_state.username}")
         if st.sidebar.button(t("logout"), use_container_width=True):
             st.session_state.username = ""
-            st.experimental_rerun()
+            st.rerun()
         return st.session_state.username
     else:
         hero(t("app_title"), t("subtitle"))

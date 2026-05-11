@@ -478,7 +478,8 @@ st.sidebar.markdown("---")
 st.sidebar.markdown(f'<div class="sb-title">{t("nav_title")}</div>', unsafe_allow_html=True)
 
 # Navigation with localized labels
-PAGE_DEFS: List[Tuple[str, str, str]] = [
+# Navigation with localized labels
+PAGE_DEFS = [
     ("Home", "🏠", t("nav_home")),
     ("Chat", "💬", t("nav_chat")),
     ("Translate", "🌐", t("nav_translate")),
@@ -489,21 +490,40 @@ PAGE_DEFS: List[Tuple[str, str, str]] = [
     ("History", "🕘", t("nav_history")),
     ("About", "ℹ️", t("nav_about")),
 ]
+
 labels = [lbl for _, _, lbl in PAGE_DEFS]
-label_to_page = {lbl: pid for pid, _, lbl in PAGE_DEFS}
+
+label_to_page = {
+    lbl: pid for pid, _, lbl in PAGE_DEFS
+}
+
+page_to_label = {
+    pid: lbl for pid, _, lbl in PAGE_DEFS
+}
+
+# 初始化页面
 if "page" not in st.session_state:
     st.session_state["page"] = "Home"
 
-current_label = st.sidebar.radio(
+# sidebar radio
+selected_label = st.sidebar.radio(
     "Go to",
     labels,
     index=labels.index(
-        next(lbl for pid, _, lbl in PAGE_DEFS if pid == st.session_state["page"])
-    ),
-    key="nav_value"
+        page_to_label[st.session_state["page"]]
+    )
 )
 
-current_page = label_to_page[current_label]
+# label -> page
+selected_page = label_to_page[selected_label]
+
+# 同步
+if selected_page != st.session_state["page"]:
+    st.session_state["page"] = selected_page
+    st.rerun()
+
+# 当前页面
+current_page = st.session_state["page"]
 
 # 同步 sidebar 和 page
 st.session_state["page"] = current_page

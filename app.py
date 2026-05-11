@@ -399,6 +399,11 @@ def feature_button(icon: str, title: str, desc: str, target_label: str, key: str
         st.session_state["page"] = target_label
         st.rerun()
 
+def back_home_button():
+    if st.button("🏠 Back Home", use_container_width=True):
+        st.session_state["page"] = "Home"
+        st.rerun()
+
 def now_ms() -> int:
     return int(time.time() * 1000)
 
@@ -563,6 +568,7 @@ if current_page == "Home":
 
 # ---------------- Chat Assistant ----------------
 elif current_page == "Chat":
+    back_home_button()
     section_header(f'{t("chat_title")} 💬', t("chat_sub"))
     lang_choices = [t("auto_detect")] + [study_lang_display[c] for c in study_lang_codes]
     sel = st.selectbox(t("msg_language"), lang_choices, index=0)
@@ -653,6 +659,7 @@ elif current_page == "Chat":
 
 # ---------------- Translation ----------------
 elif current_page == "Translate":
+    back_home_button()
     section_header(f'{t("translation_title")} 🌐', t("translation_sub"))
     source_choice = st.selectbox(
         t("source_language"),
@@ -707,6 +714,7 @@ elif current_page == "Translate":
 
 # ---------------- Grammar ----------------
 elif current_page == "Grammar":
+    back_home_button()
     section_header(f'{t("grammar_title")} ✍️', t("grammar_sub"))
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("enter_text_correct"), height=150, key="grammar_text")
@@ -751,6 +759,7 @@ elif current_page == "Grammar":
 
 # ---------------- Natural Expression ----------------
 elif current_page == "Natural":
+    back_home_button()
     section_header(f'{t("natural_title")} 🎯', t("natural_sub"))
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("enter_text_natural"), height=150, key="natural_text")
@@ -795,6 +804,7 @@ elif current_page == "Natural":
 
 # ---------------- Vocabulary ----------------
 elif current_page == "Vocabulary":
+    back_home_button()
     section_header(f'{t("vocab_title")} 📚', t("vocab_sub"))
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("enter_text_vocab"), height=150, key="vocab_text")
@@ -839,6 +849,7 @@ elif current_page == "Vocabulary":
 
 # ---------------- Tone ----------------
 elif current_page == "Tone":
+    back_home_button()
     section_header(f'{t("tone_title")} 🗣️', t("tone_sub"))
     tone_lang_choice = st.selectbox(
         t("language_of_text"),
@@ -881,6 +892,7 @@ elif current_page == "Tone":
 
 # ---------------- History ----------------
 elif current_page == "History":
+    back_home_button()
     section_header(f'{t("history_title")} 🕘', t("history_sub"))
     colf1, colf2, colf3 = st.columns(3)
     with colf1:
@@ -936,6 +948,7 @@ elif current_page == "History":
 
 # ---------------- About ----------------
 elif current_page == "About":
+    back_home_button()
     section_header(f'{t("about_title")} ℹ️')
     st.write(t("about_desc"))
 

@@ -2,7 +2,3 @@ streamlit>=1.33.0
 openai>=1.30.0
 python-dotenv>=1.0.1
 pandas>=2.2.1
-
-git add .
-git commit -m "trigger redeploy"
-git push

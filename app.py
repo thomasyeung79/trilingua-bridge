@@ -322,7 +322,7 @@ def inject_css():
         html, body, [data-testid="stAppViewContainer"]{
             background: var(--bg-soft) !important;
         }
-        .block-container{ max-width: 980px; padding-top: 1rem; padding-bottom: 3rem; }
+        .block-container{ max-width: 980px; padding-top: 6rem; padding-bottom: 3rem; }
         [data-testid="stSidebar"]{ background:#ffffff; border-right:1px solid var(--border); }
         .sb-title{ font-weight:700; font-size:1.05rem; color:var(--text); margin:.25rem 0; }
         .sb-sub{ color:var(--muted); font-size:.88rem; margin-bottom:.5rem; }

@@ -1,6 +1,7 @@
 import os
+import json
 import time
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any, List
 from openai import OpenAI
 
 MODEL_DEFAULT = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -46,7 +47,7 @@ def translate_text(text: str, source_lang: str, target_lang: str, native_lang: s
         f"User's native language is {native}. "
         "Translate the user's text into the target language while preserving meaning, tone, and nuance. "
         "If source language is not specified, detect it first. "
-        "Keep the output clean and readable. Provide only the translation."
+        "Provide only the translation."
     )
     user = f"Source language: {src}\nTarget language: {tgt}\nText:\n{text}"
     return _chat([
@@ -120,3 +121,78 @@ def analyze_tone(text: str, lang: str, native_lang: str):
         {"role": "system", "content": system},
         {"role": "user", "content": user},
     ], temperature=0.3)
+
+def chat_reply_assistant(
+    text: str,
+    source_lang: str,
+    target_lang: str,
+    native_lang: str,
+    temperature: float = 0.3,
+    max_vocab: int = 6
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Returns (result_dict, usage)
+    result_dict contains:
+      - detected_source_lang: 'zh'|'ko'|'en'
+      - translation: str (in target language)
+      - vocabulary: list of {item, meaning_native, example_target, note}
+      - reply_natural: str (in target language)
+      - reply_polite: str (in target language)
+      - reply_casual: str (in target language)
+    """
+    src = "Auto-detect" if source_lang == "auto" else _to_lang_name(source_lang)
+    tgt = _to_lang_name(target_lang)
+    native = _to_lang_name(native_lang)
+
+    system = (
+        "You are a multilingual chat reply assistant.\n"
+        f"User's native language: {native}.\n"
+        f"Target language for study and replies: {tgt}.\n"
+        "Your job: given a user message, produce a structured JSON with:\n"
+        "detected_source_lang: language code of the user message ('zh'|'ko'|'en')\n"
+        "translation: translation of the user message into the target language\n"
+        "vocabulary: up to N important words/phrases useful for learners; for each include:\n"
+        "  - item (the word/phrase)\n"
+        "  - meaning_native (explanation in the user's native language)\n"
+        "  - example_target (a short example sentence in the target language)\n"
+        "  - note (brief usage note)\n"
+        "reply_natural: a natural, context-appropriate reply in the target language\n"
+        "reply_polite: a more polite version of the reply in the target language\n"
+        "reply_casual: a casual/friendly version in the target language\n"
+        "Rules:\n"
+        "- Output STRICT JSON only (no markdown, no code fences).\n"
+        "- Use exactly these keys: detected_source_lang, translation, vocabulary, reply_natural, reply_polite, reply_casual.\n"
+        "- detected_source_lang must be one of: 'zh', 'ko', 'en'.\n"
+        "- Keep replies concise and natural.\n"
+    )
+    user = json.dumps({
+        "source_language_hint": src,
+        "target_language": tgt,
+        "native_language": native,
+        "max_vocab": max_vocab,
+        "message": text
+    }, ensure_ascii=False)
+
+    content, usage = _chat([
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ], temperature=temperature)
+
+    # Try parse JSON
+    result: Dict[str, Any] = {}
+    try:
+        result = json.loads(content)
+        # Ensure vocabulary is list
+        if not isinstance(result.get("vocabulary", []), list):
+            result["vocabulary"] = []
+    except Exception:
+        # Fallback minimal result
+        result = {
+            "detected_source_lang": source_lang if source_lang != "auto" else None,
+            "translation": content,
+            "vocabulary": [],
+            "reply_natural": "",
+            "reply_polite": "",
+            "reply_casual": "",
+        }
+    return result, usage

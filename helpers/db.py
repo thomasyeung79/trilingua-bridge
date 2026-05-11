@@ -17,8 +17,7 @@ def _get_conn():
 
 def _column_exists(conn, table: str, col: str) -> bool:
     cur = conn.execute(f"PRAGMA table_info({table});")
-    cols = [r[1] for r in cur.fetchall()]
-    return col in cols
+    return any(row[1] == col for row in cur.fetchall())
 
 def _ensure_indexes(conn):
     try:
@@ -29,7 +28,7 @@ def _ensure_indexes(conn):
 
 def init_db():
     conn = _get_conn()
-    # Create table if not exists (with username column)
+    # Base table (add username, native_lang, ui_lang columns for isolation and context)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,6 +37,8 @@ def init_db():
             feature TEXT NOT NULL,
             source_lang TEXT,
             target_lang TEXT,
+            native_lang TEXT,
+            ui_lang TEXT,
             user_input TEXT,
             ai_output TEXT,
             extra TEXT,
@@ -47,12 +48,13 @@ def init_db():
             latency_ms INTEGER
         );
     """)
-    # Migrate: add username if missing
-    if not _column_exists(conn, "history", "username"):
-        try:
-            conn.execute("ALTER TABLE history ADD COLUMN username TEXT;")
-        except Exception:
-            pass
+    # Migrations for older DBs
+    for col in ("username", "native_lang", "ui_lang"):
+        if not _column_exists(conn, "history", col):
+            try:
+                conn.execute(f"ALTER TABLE history ADD COLUMN {col} TEXT;")
+            except Exception:
+                pass
     _ensure_indexes(conn)
     conn.commit()
 
@@ -63,6 +65,8 @@ def insert_history(
     target_lang: str,
     user_input: str,
     ai_output: str,
+    native_lang: Optional[str] = None,
+    ui_lang: Optional[str] = None,
     extra: Optional[Dict[str, Any]] = None,
     tokens_input: Optional[int] = None,
     tokens_output: Optional[int] = None,
@@ -74,11 +78,12 @@ def insert_history(
     conn.execute("""
         INSERT INTO history (
             timestamp, username, feature, source_lang, target_lang,
-            user_input, ai_output, extra, tokens_input, tokens_output, model, latency_ms
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            native_lang, ui_lang, user_input, ai_output, extra,
+            tokens_input, tokens_output, model, latency_ms
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         ts, username, feature, source_lang, target_lang,
-        user_input, ai_output, json.dumps(extra or {}, ensure_ascii=False),
+        native_lang, ui_lang, user_input, ai_output, json.dumps(extra or {}, ensure_ascii=False),
         tokens_input, tokens_output, model, latency_ms
     ))
     conn.commit()
@@ -98,24 +103,20 @@ def fetch_history(
     clauses = ["username = ?"]
     params: list = [username]
     if feature:
-        clauses.append("feature = ?")
-        params.append(feature)
+        clauses.append("feature = ?"); params.append(feature)
     if source_lang:
-        clauses.append("source_lang = ?")
-        params.append(source_lang)
+        clauses.append("source_lang = ?"); params.append(source_lang)
     if target_lang:
-        clauses.append("target_lang = ?")
-        params.append(target_lang)
+        clauses.append("target_lang = ?"); params.append(target_lang)
     if search:
         clauses.append("(user_input LIKE ? OR ai_output LIKE ?)")
-        like = f"%{search}%"
-        params.extend([like, like])
+        like = f"%{search}%"; params.extend([like, like])
 
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     sql = f"""
         SELECT id, timestamp, username, feature, source_lang, target_lang,
-               user_input, ai_output, extra, tokens_input, tokens_output,
-               model, latency_ms
+               native_lang, ui_lang, user_input, ai_output, extra,
+               tokens_input, tokens_output, model, latency_ms
         FROM history
         {where}
         ORDER BY id {order}

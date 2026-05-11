@@ -396,7 +396,7 @@ def feature_button(icon: str, title: str, desc: str, target_label: str, key: str
         type="secondary",
     )
     if clicked:
-        st.session_state["current_page"] = target_label
+        st.session_state["page"] = target_label
         st.rerun()
 
 def now_ms() -> int:

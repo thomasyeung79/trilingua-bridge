@@ -299,36 +299,67 @@ st.sidebar.markdown(
 
 lang_display = get_lang_display()
 
+# =========================
+# Native Language
+# =========================
+
 native_lang = st.sidebar.selectbox(
     t("my_native"),
     STUDY_LANG_CODES,
     index=STUDY_LANG_CODES.index(st.session_state.native_lang),
     format_func=lambda code: lang_display.get(code, code),
-    key="native_lang",
+    key="native_lang_select",
 )
+
+st.session_state.native_lang = native_lang
+
+
+# =========================
+# Target Language
+# =========================
 
 target_lang = st.sidebar.selectbox(
     t("i_learn"),
     STUDY_LANG_CODES,
     index=STUDY_LANG_CODES.index(st.session_state.target_lang),
     format_func=lambda code: lang_display.get(code, code),
-    key="target_lang",
+    key="target_lang_select",
 )
+
+st.session_state.target_lang = target_lang
+
+
+# =========================
+# Swap Button
+# =========================
 
 if st.sidebar.button(f"⇄ {t('swap')}", use_container_width=True):
     st.session_state.native_lang, st.session_state.target_lang = (
         st.session_state.target_lang,
         st.session_state.native_lang,
     )
+
     st.rerun()
+
+
+# =========================
+# Persona
+# =========================
 
 persona_code = st.sidebar.selectbox(
     t("persona"),
     PERSONA_CODES,
     index=PERSONA_CODES.index(st.session_state.persona_code),
     format_func=persona_display,
-    key="persona_code",
+    key="persona_code_select",
 )
+
+st.session_state.persona_code = persona_code
+
+
+# =========================
+# Temperature
+# =========================
 
 temperature = st.sidebar.slider(
     t("creativity"),
@@ -336,23 +367,39 @@ temperature = st.sidebar.slider(
     1.0,
     st.session_state.temperature,
     0.1,
-    key="temperature",
+    key="temperature_slider",
 )
+
+st.session_state.temperature = temperature
+
+
+# =========================
+# Model
+# =========================
 
 model = st.sidebar.text_input(
     t("model"),
     value=st.session_state.model_input,
-    key="model_input",
+    key="model_input_text",
 )
 
-st.sidebar.checkbox(
+st.session_state.model_input = model
+
+
+# =========================
+# Pronunciation Toggle
+# =========================
+
+show_pron = st.sidebar.checkbox(
     t("show_pron"),
     value=st.session_state.show_pron,
-    key="show_pron",
+    key="show_pron_checkbox",
 )
 
-st.sidebar.info(t("tip"))
+st.session_state.show_pron = show_pron
 
+
+st.sidebar.info(t("tip"))
 
 NAV_ITEMS = [
     ("Home", f"🏠 {t('nav_home')}"),

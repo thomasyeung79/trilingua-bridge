@@ -539,14 +539,14 @@ selected_label = st.sidebar.radio(t("nav_title"), labels, index=labels.index(lab
 selected_page = page_from_label[selected_label]
 if selected_page != st.session_state.page:
     st.session_state.page = selected_page
-    st.experimental_rerun()
+    st.rerun()
 
 page = st.session_state.page
 
 def back_home_button():
     if st.button(f"🏠 {t('back_home')}", use_container_width=True):
         st.session_state.page = "Home"
-        st.experimental_rerun()
+        st.rerun()
 
 # ----------------------- Pages -----------------------
 if page == "Home":

@@ -3,7 +3,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
-DB_PATH = os.getenv("DB_PATH", "trilingua_v2.db")
+DB_PATH = os.getenv("DB_PATH", "trilingua.db")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS history (
@@ -31,19 +31,70 @@ CREATE INDEX IF NOT EXISTS idx_history_persona ON history (persona);
 """
 
 def _connect() -> sqlite3.Connection:
-    # Create directory if needed
+    # Ensure directory exists
     db_dir = os.path.dirname(DB_PATH)
     if db_dir and not os.path.exists(db_dir):
         os.makedirs(db_dir, exist_ok=True)
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    return con
+
+def _set_pragmas(con: sqlite3.Connection) -> None:
+    cur = con.cursor()
+    # Improve concurrency and durability balance
+    cur.execute("PRAGMA journal_mode=WAL;")
+    cur.execute("PRAGMA synchronous=NORMAL;")
+    cur.execute("PRAGMA foreign_keys=ON;")
+
+def _columns(con: sqlite3.Connection, table: str) -> List[str]:
+    cur = con.cursor()
+    cur.execute(f"PRAGMA table_info({table});")
+    return [row[1] for row in cur.fetchall()]
+
+def _ensure_migrations(con: sqlite3.Connection) -> None:
+    """
+    Best-effort migrations for older schemas:
+    - If only 'feature' exists but not 'mode', add 'mode' and backfill from 'feature'
+    - Ensure 'persona' and 'ui_lang' exist
+    """
+    cur = con.cursor()
+    cols = _columns(con, "history")
+
+    # If table didn't exist, SCHEMA_SQL just created it and cols are up-to-date
+    # Handle legacy 'feature' -> 'mode'
+    if "mode" not in cols and "feature" in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN mode TEXT;")
+        cur.execute("UPDATE history SET mode = feature WHERE mode IS NULL OR mode = '';")
+
+    # Add missing newer columns if absent
+    cols = _columns(con, "history")
+    if "persona" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN persona TEXT;")
+    if "ui_lang" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN ui_lang TEXT;")
+    if "tokens_input" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN tokens_input INTEGER;")
+    if "tokens_output" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN tokens_output INTEGER;")
+    if "model" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN model TEXT;")
+    if "latency_ms" not in cols:
+        cur.execute("ALTER TABLE history ADD COLUMN latency_ms INTEGER;")
+
+    # Recreate indexes if needed
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_user_ts ON history (username, timestamp DESC);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_mode ON history (mode);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_langs ON history (source_lang, target_lang);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_persona ON history (persona);")
 
 def init_db() -> None:
     with _connect() as con:
+        _set_pragmas(con)
         cur = con.cursor()
         for stmt in SCHEMA_SQL.strip().split(";"):
             s = stmt.strip()
             if s:
                 cur.execute(s)
+        _ensure_migrations(con)
         con.commit()
 
 def insert_history(
@@ -61,8 +112,13 @@ def insert_history(
     model: Optional[str],
     latency_ms: Optional[int],
 ) -> None:
+    """
+    Insert a history row. All text fields default to "" if None.
+    Token/model/latency fields accept None.
+    """
     ts = int(time.time() * 1000)
     with _connect() as con:
+        _set_pragmas(con)
         cur = con.cursor()
         cur.execute(
             """
@@ -100,8 +156,14 @@ def fetch_history(
     persona: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
+    """
+    Fetch recent history for a user with optional filters.
+    - search does a LIKE on user_input and ai_output.
+    """
     if not username:
         return []
+
+    limit = max(1, int(limit or 50))
 
     where = ["username = ?"]
     params: List[Any] = [username]
@@ -133,11 +195,12 @@ def fetch_history(
         ORDER BY timestamp DESC
         LIMIT ?
     """
-    params.append(int(limit))
+    params.append(limit)
 
     rows: List[Dict[str, Any]] = []
     with _connect() as con:
         con.row_factory = sqlite3.Row
+        _set_pragmas(con)
         cur = con.cursor()
         cur.execute(sql, params)
         for r in cur.fetchall():

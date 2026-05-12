@@ -455,7 +455,7 @@ ui_lang_selected = st.sidebar.selectbox(
 )
 if ui_lang_selected != st.session_state.ui_lang:
     st.session_state.ui_lang = ui_lang_selected
-    st.experimental_rerun()
+    st.rerun()
 
 # ----------------------- Sidebar: Account -----------------------
 def require_login() -> str:

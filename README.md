@@ -1,67 +1,72 @@
 TriLingua Bridge
 
-Learn Chinese, Korean, and English with AI.
-
-What’s new
-- Trilingual learner directions
-  - Chinese speakers learning Korean or English
-  - Korean speakers learning Chinese or English
-  - English speakers learning Chinese or Korean
-  - Choose both “My native language” and “I want to learn” for every AI feature
-- Full UI localization
-  - Interface language selector: English / 简体中文 / 한국어
-  - All titles, labels, buttons, navigation, and result headings localize automatically
-- Per-user data isolation (username)
-  - Every insert and query is filtered by username
-  - New fields native_lang and ui_lang recorded with each history entry
-- Modern UI
-  - Soft background, rounded colorful cards, mobile-friendly
-  - Attractive Home with feature cards
+AI Language & Cross-Cultural Communication Assistant for Chinese, Korean, and English.
+This is not a social app; it’s an AI assistant that helps you with real conversations.
 
 Features
-- AI Chat Reply Assistant (translate, key vocab, natural/polite/casual replies)
-- Translation (Chinese/Korean/English)
-- Grammar correction
-- Natural expression suggestions
-- Vocabulary explanation
-- Tone analysis (polite, casual, formal)
-- Learning history in SQLite (user-isolated)
+- Core modes:
+  - What I Want to Say: multiple versions (direct, natural, young/casual, polite, close-friend) + tone notes
+  - What Does This Mean?: literal vs natural meaning, hidden tone, vibe, how to interpret, how to reply
+  - AI Chat Coach: analyze a snippet, what to avoid, good patterns, recommended reply
+  - K-pop / K-drama Context: EN/ZH meaning, word breakdown, grammar, natural usage, casual example, cultural note
+- Tools:
+  - Chat Reply Assistant
+  - Translation
+  - Grammar Correction
+  - Natural Expression
+  - Vocabulary Explanation
+  - Tone Analysis
+- History: user-isolated records stored in SQLite
+- Multilingual UI: English, 简体中文, 한국어
+- Personas, creativity (temperature), and model override
 
-Tech Stack
-- Python + Streamlit
-- OpenAI API (no hardcoded keys; uses environment)
-- SQLite (default) or adapt db helper for MySQL
-- python-dotenv for configuration
+Architecture
+- Streamlit frontend (app.py)
+- ai_helper.py: LLM prompts and OpenAI API calls
+- db.py: SQLite storage
+- .env configuration via python-dotenv
 
-Project Structure
-- app.py (Streamlit app with UI localization)
-- helpers/
-  - ai_helper.py (model prompts/calls)
-  - db.py (SQLite helper with username isolation + native/ui language columns)
-- requirements.txt
-- .env.example
-- README.md
+Quickstart
+1) Requirements
+- Python 3.9+ recommended
+- pip install -r requirements.txt (or install packages below)
 
-Setup
-1) Create virtualenv and install
-   python -m venv .venv
-   source .venv/bin/activate  # macOS/Linux
-   .venv\\Scripts\\activate   # Windows
-   pip install -r requirements.txt
+Minimal requirements.txt
+streamlit>=1.30
+python-dotenv>=1.0.0
+openai>=1.0.0
 
-2) Configure environment
-   - Copy .env.example to .env
-   - Set OPENAI_API_KEY
-   - Optional: OPENAI_MODEL (default gpt-4o-mini), DB_PATH
+2) Environment variables
+Create a .env file in the project root:
+OPENAI_API_KEY=sk-...
+# Optional overrides:
+# OPENAI_MODEL=gpt-4o-mini
+# OPENAI_BASE_URL=https://api.openai.com/v1
+# DB_PATH=trilingua.db
 
-3) Run
-   streamlit run app.py
+3) Initialize and run
+- Ensure db.py and ai_helper.py are in the same directory as app.py
+- Run:
+  streamlit run app.py
 
-Notes
-- UI language only changes the interface; it does not force the study languages (select those in sidebar).
-- All history queries include username filtering to ensure account isolation.
-- The DB helper auto-migrates older databases to include username/native_lang/ui_lang columns.
-- To reset data, delete the DB file specified by DB_PATH.
+4) Login model
+- The app uses a simple “username” field to separate history. No password/auth backend here.
+- Each user only sees their own records.
+
+Notes and tips
+- Explanations are produced in your native language (sidebar preference).
+- Examples and rewrites are produced in your target language.
+- You can override the model in the sidebar (defaults to gpt-4o-mini). Any chat-completions-capable model should work.
+- If you need to use a compatible proxy or different provider, set OPENAI_BASE_URL accordingly.
+
+Data storage
+- SQLite DB (DB_PATH/.env) with a single history table
+- Fields: username, timestamp, mode, langs, persona, ui_lang, user_input, ai_output, token usage, model, latency
+
+Troubleshooting
+- Missing OPENAI_API_KEY: set it in .env and restart.
+- openai module not found: pip install openai>=1.0.0
+- Database file permission issues: adjust DB_PATH or directory permissions.
 
 License
-- Educational/demo. Adapt for production (auth, rate limits, error handling, etc.).
+- For personal and educational use. Review your model provider’s terms for API usage and data handling.

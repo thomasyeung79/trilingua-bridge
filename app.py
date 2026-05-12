@@ -603,7 +603,14 @@ elif page == "Say":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            source_lang = "auto" if source_choice == t("auto_detect") else lang_label_to_code(source_choice)
+            if source_choice == t("auto_detect"):
+                source_lang = "auto"
+            elif "Chinese" in source_choice or "中文" in source_choice or "중국어" in source_choice:
+                source_lang = "zh"
+            elif "Korean" in source_choice or "韩语" in source_choice or "한국어" in source_choice:
+                source_lang = "ko"
+            else:
+                source_lang = "en"
             
             start = now_ms()
 

@@ -4,7 +4,7 @@ import time
 from typing import Optional, List, Dict, Any
 
 
-DB_PATH = os.environ.get("DB_PATH") or None
+DB_PATH = os.environ.get("DB_PATH") or "trilingua.db"
 
 
 def _db_path() -> str:
@@ -25,11 +25,17 @@ def _db_path() -> str:
     except Exception:
         pass
 
-    return DB_PATH or "trilingua.db"
+    return DB_PATH
 
 
-def _get_conn():
-    return sqlite3.connect(_db_path(), check_same_thread=False)
+def _get_conn() -> sqlite3.Connection:
+    db_path = _db_path()
+    folder = os.path.dirname(db_path)
+
+    if folder and not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+
+    return sqlite3.connect(db_path, check_same_thread=False)
 
 
 def init_db():
@@ -53,7 +59,7 @@ def init_db():
             tokens_input INTEGER,
             tokens_output INTEGER,
             latency_ms INTEGER,
-            timestamp INTEGER
+            timestamp INTEGER NOT NULL
         );
         """
     )
@@ -147,7 +153,6 @@ def fetch_history(
     persona: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-
     conn = _get_conn()
     cur = conn.cursor()
 
@@ -200,7 +205,6 @@ def fetch_history(
 
     cur.execute(query, args)
     rows = cur.fetchall()
-
     conn.close()
 
     history = []

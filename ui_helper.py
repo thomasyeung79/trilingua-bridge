@@ -90,8 +90,8 @@ TEXTS = {
         "mode_mean_sub": "Paste a message and understand the meaning, tone, and reply direction.",
         "mode_coach": "AI Chat Coach",
         "mode_coach_sub": "Paste a chat and get reply advice.",
-        "mode_kpop": "K-pop / K-drama Context",
-        "mode_kpop_sub": "Understand Korean lyrics or drama lines.",
+        "mode_kpop": "Lyrics & Drama Context",
+        "mode_kpop_sub": "Understand lyrics, drama dialogue, and pop culture expressions.",
 
         "feature_chat": "Chat Reply Assistant",
         "feature_translate": "Translation",
@@ -212,8 +212,8 @@ TEXTS = {
         "mode_mean_sub": "理解对方消息的含义、语气和回复方向。",
         "mode_coach": "AI 聊天教练",
         "mode_coach_sub": "粘贴聊天内容，获得回复建议。",
-        "mode_kpop": "K-pop / 韩剧语境",
-        "mode_kpop_sub": "理解韩语歌词或韩剧台词。",
+        "mode_kpop": "歌词 / 台词语境",
+        "mode_kpop_sub": "理解歌词、影视台词与流行文化表达。",
 
         "feature_chat": "聊天回复助手",
         "feature_translate": "翻译",
@@ -334,8 +334,8 @@ TEXTS = {
         "mode_mean_sub": "메시지의 의미, 톤, 답장 방향을 이해합니다.",
         "mode_coach": "AI 채팅 코치",
         "mode_coach_sub": "채팅 내용을 붙여넣고 답장 조언을 받습니다.",
-        "mode_kpop": "K-pop / 드라마 맥락",
-        "mode_kpop_sub": "한국어 가사나 드라마 대사를 이해합니다.",
+        "mode_kpop": "가사 · 드라마 맥락",
+        "mode_kpop_sub": "노래 가사, 드라마 대사, 유행 표현을 이해하세요.",
 
         "feature_chat": "채팅 답장 도우미",
         "feature_translate": "번역",

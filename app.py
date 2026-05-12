@@ -590,12 +590,13 @@ elif page == "Say":
     cols = st.columns(2)
     with cols[0]:
         source_choice = st.selectbox(
-            t("source_language"),
-            source_lang = source_choice,
-            index=0,
-            format_func=lambda c: t("auto_detect") if c == "auto" else get_lang_display().get(c, c),
-            key="say_source_lang"
+             t("source_language"),
+             options=["auto"] + STUDY_LANG_CODES,
+             index=0,
+             format_func=lambda c: t("auto_detect") if c == "auto" else get_lang_display().get(c, c),
+             key="say_source_lang"
         )
+        
     with cols[1]:
         run_btn = st.button(t("run"), use_container_width=True)
 
@@ -606,8 +607,6 @@ elif page == "Say":
             source_lang = source_choice
             
             start = now_ms()
-
-            st.write("DEBUG:", source_lang, target_lang, native_lang)
 
             result, usage, detected = translate_text(
                 text=text,

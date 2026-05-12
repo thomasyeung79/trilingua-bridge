@@ -603,6 +603,8 @@ elif page == "Say":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
+            source_lang = "auto" if source_choice == t("auto_detect") else lang_label_to_code(source_choice)
+            
             start = now_ms()
 
             result, usage = translate_text(

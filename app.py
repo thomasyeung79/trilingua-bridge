@@ -607,13 +607,13 @@ elif page == "Say":
 
             result, usage = translate_text(
                 text=text,
-                source_lang=source_choice,
+                source_lang=source_lang,
                 target_lang=target_lang,
                 native_lang=native_lang,
                 temperature=temperature,
             )
 
-            detected = source_choice
+            detected = source_lang
             latency_ms = now_ms() - start
             usage = usage or {}
 

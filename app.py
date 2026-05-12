@@ -1,7 +1,6 @@
-import os
 import json
 import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional, Callable, Tuple
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -18,13 +17,13 @@ from helpers.ai_helper import (
 
 # ----------------------- Boot -----------------------
 load_dotenv()
+st.set_page_config(page_title="TriLingua Bridge", layout="centered")
 
+# 初始化数据库（放在 set_page_config 之后，且仅在失败时提示）
 try:
     init_db()
 except Exception as e:
     st.warning(f"Database init failed: {e}")
-
-st.set_page_config(page_title="TriLingua Bridge", layout="centered")
 
 # ----------------------- UI Text -----------------------
 UI_LANGS = ["English", "简体中文", "한국어"]
@@ -331,7 +330,7 @@ def insert_history_safe(
     source_lang: str,
     target_lang: str,
     native_lang: str,
-    persona: str,
+    persona_code: str,
     ui_lang: str,
     user_input: str,
     ai_output: str,
@@ -345,7 +344,7 @@ def insert_history_safe(
             source_lang=source_lang,
             target_lang=target_lang,
             native_lang=native_lang,
-            persona=persona,
+            persona=persona_code,  # 保存 persona_code，展示时再映射
             ui_lang=ui_lang,
             user_input=user_input,
             ai_output=ai_output,
@@ -355,6 +354,7 @@ def insert_history_safe(
             latency_ms=latency_ms,
         )
     except TypeError:
+        # 兼容旧版签名
         insert_history(
             username=username,
             feature=mode,
@@ -364,7 +364,7 @@ def insert_history_safe(
             ui_lang=ui_lang,
             user_input=user_input,
             ai_output=ai_output,
-            extra={"persona": persona},
+            extra={"persona": persona_code},
             tokens_input=usage.get("prompt_tokens"),
             tokens_output=usage.get("completion_tokens"),
             model=usage.get("model"),
@@ -374,13 +374,17 @@ def insert_history_safe(
         st.warning(f"History save failed: {e}")
 
 def show_model_caption(usage: Dict[str, Any], latency_ms: int):
+    model = usage.get("model") or "-"
+    pt = usage.get("prompt_tokens")
+    ct = usage.get("completion_tokens")
+    pt = pt if isinstance(pt, int) else "-"
+    ct = ct if isinstance(ct, int) else "-"
     st.caption(
-        f'{t("model_info_prefix")}: {usage.get("model")} • '
-        f'Tokens(in/out): {usage.get("prompt_tokens")}/{usage.get("completion_tokens")} • '
+        f'{t("model_info_prefix")}: {model} • '
+        f'Tokens(in/out): {pt}/{ct} • '
         f'Latency: {latency_ms} ms'
     )
 
-# ----------------------- CSS -----------------------
 def inject_css():
     st.markdown(
         """
@@ -430,6 +434,54 @@ def back_home_button():
         st.session_state.page = "Home"
         safe_rerun()
 
+def run_ai_task(
+    task_fn: Callable[..., Tuple[str, Dict[str, Any]]],
+    task_kwargs: Dict[str, Any],
+    history_kwargs: Dict[str, Any],
+):
+    start = now_ms()
+    try:
+        result = None
+        usage = {}
+        out = task_fn(**task_kwargs)
+        # 兼容不同函数返回：(result, usage) 或 (result, usage, detected)
+        if isinstance(out, tuple) and len(out) == 3:
+            result, usage, detected = out
+            history_kwargs["source_lang"] = detected or history_kwargs.get("source_lang")
+        elif isinstance(out, tuple) and len(out) == 2:
+            result, usage = out
+        else:
+            result = str(out)
+            usage = {}
+        usage = usage or {}
+    except Exception as e:
+        st.error(f"AI call failed: {e}")
+        return
+    latency_ms = now_ms() - start
+
+    st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
+    try:
+        # 如果是 JSON 结构也能优雅显示
+        st.json(json.loads(result))
+    except Exception:
+        st.markdown(result)
+    show_model_caption(usage, latency_ms)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    insert_history_safe(
+        username=history_kwargs["username"],
+        mode=history_kwargs["mode"],
+        source_lang=history_kwargs["source_lang"],
+        target_lang=history_kwargs["target_lang"],
+        native_lang=history_kwargs["native_lang"],
+        persona_code=history_kwargs["persona_code"],
+        ui_lang=history_kwargs["ui_lang"],
+        user_input=history_kwargs["user_input"],
+        ai_output=result,
+        usage=usage,
+        latency_ms=latency_ms,
+    )
+
 # ----------------------- State -----------------------
 inject_css()
 
@@ -439,6 +491,16 @@ if "page" not in st.session_state:
     st.session_state.page = "Home"
 if "username" not in st.session_state:
     st.session_state.username = ""
+if "native_lang" not in st.session_state:
+    st.session_state.native_lang = "zh"
+if "target_lang" not in st.session_state:
+    st.session_state.target_lang = "ko"
+if "persona_code" not in st.session_state:
+    st.session_state.persona_code = PERSONA_CODES[0]
+if "temperature" not in st.session_state:
+    st.session_state.temperature = 0.3
+if "model_input" not in st.session_state:
+    st.session_state.model_input = "gpt-4o-mini"
 
 # ----------------------- Sidebar -----------------------
 ui_lang_selected = st.sidebar.selectbox(
@@ -491,13 +553,12 @@ target_lang = st.sidebar.selectbox(
 persona_code = st.sidebar.selectbox(
     t("persona"),
     PERSONA_CODES,
-    index=0,
+    index=PERSONA_CODES.index(st.session_state.get("persona_code", PERSONA_CODES[0])),
     format_func=persona_display,
     key="persona_code",
 )
-persona = persona_display(persona_code)
-temperature = st.sidebar.slider(t("creativity"), 0.0, 1.0, 0.3, 0.1, key="temperature")
-model = st.sidebar.text_input(t("model"), value="gpt-4o-mini", key="model_input")
+temperature = st.sidebar.slider(t("creativity"), 0.0, 1.0, st.session_state.get("temperature", 0.3), 0.1, key="temperature")
+model = st.sidebar.text_input(t("model"), value=st.session_state.get("model_input", "gpt-4o-mini"), key="model_input")
 st.sidebar.info(t("tip"))
 
 NAV_ITEMS = [
@@ -597,34 +658,26 @@ elif page in ["Say", "Translate"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage, detected = call_translate(
-                text=text,
-                source_lang=source_choice,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                temperature=temperature,
-                model=model,
-            )
-            latency_ms = now_ms() - start
-
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            insert_history_safe(
-                username=username,
-                mode=mode_name,
-                source_lang=detected or source_choice,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                persona=persona,
-                ui_lang=st.session_state.ui_lang,
-                user_input=text,
-                ai_output=result,
-                usage=usage,
-                latency_ms=latency_ms,
+            run_ai_task(
+                task_fn=call_translate,
+                task_kwargs=dict(
+                    text=text,
+                    source_lang=source_choice,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode=mode_name,
+                    source_lang=source_choice,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
 
 elif page in ["Mean", "Coach", "Kpop"]:
@@ -658,34 +711,28 @@ elif page in ["Mean", "Coach", "Kpop"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage, detected = call_translate(
-                text=text,
-                source_lang=source_choice,
-                target_lang=native_lang if page in ["Mean", "Coach"] else target_lang,
-                native_lang=native_lang,
-                temperature=temperature,
-                model=model,
-            )
-            latency_ms = now_ms() - start
-
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-            insert_history_safe(
-                username=username,
-                mode=mode_map[page],
-                source_lang=detected or source_choice,
-                target_lang=native_lang if page in ["Mean", "Coach"] else target_lang,
-                native_lang=native_lang,
-                persona=persona,
-                ui_lang=st.session_state.ui_lang,
-                user_input=text,
-                ai_output=result,
-                usage=usage,
-                latency_ms=latency_ms,
+            # Mean/Coach -> 输出到母语；Kpop -> 输出到学习语言
+            out_lang = native_lang if page in ["Mean", "Coach"] else target_lang
+            run_ai_task(
+                task_fn=call_translate,
+                task_kwargs=dict(
+                    text=text,
+                    source_lang=source_choice,
+                    target_lang=out_lang,
+                    native_lang=native_lang,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode=mode_map[page],
+                    source_lang=source_choice,
+                    target_lang=out_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
 
 elif page == "Chat":
@@ -710,23 +757,31 @@ elif page == "Chat":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage, detected = chat_reply_assistant(
-                text=text,
-                source_lang=source_choice,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                persona=persona,
-                temperature=temperature,
-                model=model,
+            def _chat_wrapper(**kwargs):
+                r, u, detected = chat_reply_assistant(**kwargs)
+                return r, u, detected
+            run_ai_task(
+                task_fn=_chat_wrapper,
+                task_kwargs=dict(
+                    text=text,
+                    source_lang=source_choice,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona=persona_code,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode="chat",
+                    source_lang=source_choice,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
-            usage = usage or {}
-            latency_ms = now_ms() - start
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-            insert_history_safe(username, "chat", detected or source_choice, target_lang, native_lang, persona, st.session_state.ui_lang, text, result, usage, latency_ms)
 
 elif page == "Grammar":
     back_home_button()
@@ -744,23 +799,31 @@ elif page == "Grammar":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage = correct_grammar(
-                text=text,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                level=level.lower(),
-                persona=persona,
-                temperature=temperature,
-                model=model,
+            def _wrap(**kwargs):
+                r, u = correct_grammar(**kwargs)
+                return r, u
+            run_ai_task(
+                task_fn=_wrap,
+                task_kwargs=dict(
+                    text=text,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    level=level.lower(),
+                    persona=persona_code,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode="grammar",
+                    source_lang=target_lang,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
-            usage = usage or {}
-            latency_ms = now_ms() - start
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-            insert_history_safe(username, "grammar", target_lang, target_lang, native_lang, persona, st.session_state.ui_lang, text, result, usage, latency_ms)
 
 elif page == "Natural":
     back_home_button()
@@ -778,23 +841,31 @@ elif page == "Natural":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage = suggest_natural_expression(
-                text=text,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                tone_preference=tone_pref.lower(),
-                persona=persona,
-                temperature=temperature,
-                model=model,
+            def _wrap(**kwargs):
+                r, u = suggest_natural_expression(**kwargs)
+                return r, u
+            run_ai_task(
+                task_fn=_wrap,
+                task_kwargs=dict(
+                    text=text,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    tone_preference=tone_pref.lower(),
+                    persona=persona_code,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode="natural",
+                    source_lang=target_lang,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
-            usage = usage or {}
-            latency_ms = now_ms() - start
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-            insert_history_safe(username, "natural", target_lang, target_lang, native_lang, persona, st.session_state.ui_lang, text, result, usage, latency_ms)
 
 elif page == "Vocabulary":
     back_home_button()
@@ -812,23 +883,31 @@ elif page == "Vocabulary":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage = explain_vocabulary(
-                text=text,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                max_items=max_items,
-                persona=persona,
-                temperature=temperature,
-                model=model,
+            def _wrap(**kwargs):
+                r, u = explain_vocabulary(**kwargs)
+                return r, u
+            run_ai_task(
+                task_fn=_wrap,
+                task_kwargs=dict(
+                    text=text,
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    max_items=max_items,
+                    persona=persona_code,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode="vocabulary",
+                    source_lang="auto",
+                    target_lang=target_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
-            usage = usage or {}
-            latency_ms = now_ms() - start
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-            insert_history_safe(username, "vocabulary", "auto", target_lang, native_lang, persona, st.session_state.ui_lang, text, result, usage, latency_ms)
 
 elif page == "Tone":
     back_home_button()
@@ -851,22 +930,30 @@ elif page == "Tone":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            start = now_ms()
-            result, usage = analyze_tone(
-                text=text,
-                lang=tone_lang,
-                native_lang=native_lang,
-                persona=persona,
-                temperature=temperature,
-                model=model,
+            def _wrap(**kwargs):
+                r, u = analyze_tone(**kwargs)
+                return r, u
+            run_ai_task(
+                task_fn=_wrap,
+                task_kwargs=dict(
+                    text=text,
+                    lang=tone_lang,
+                    native_lang=native_lang,
+                    persona=persona_code,
+                    temperature=temperature,
+                    model=model,
+                ),
+                history_kwargs=dict(
+                    username=username,
+                    mode="tone",
+                    source_lang=tone_lang,
+                    target_lang=tone_lang,
+                    native_lang=native_lang,
+                    persona_code=persona_code,
+                    ui_lang=st.session_state.ui_lang,
+                    user_input=text,
+                ),
             )
-            usage = usage or {}
-            latency_ms = now_ms() - start
-            st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-            st.markdown(result)
-            show_model_caption(usage, latency_ms)
-            st.markdown("</div>", unsafe_allow_html=True)
-            insert_history_safe(username, "tone", tone_lang, tone_lang, native_lang, persona, st.session_state.ui_lang, text, result, usage, latency_ms)
 
 elif page == "History":
     back_home_button()
@@ -880,7 +967,7 @@ elif page == "History":
     with c3:
         f_target = st.selectbox(t("filter_target"), ["All", "zh", "ko", "en"], index=0)
     with c4:
-        f_persona = st.selectbox(t("filter_persona"), ["All"] + [persona_display(p) for p in PERSONA_CODES], index=0)
+        f_persona_code = st.selectbox(t("filter_persona"), ["All"] + PERSONA_CODES, index=0, format_func=lambda c: c if c == "All" else persona_display(c))
 
     search = st.text_input(t("search_in"))
     limit = st.slider(t("show_last"), 10, 200, 50, 10)
@@ -893,10 +980,11 @@ elif page == "History":
             mode=None if f_mode == "All" else f_mode,
             source_lang=None if f_source == "All" else f_source,
             target_lang=None if f_target == "All" else f_target,
-            persona=None if f_persona == "All" else f_persona,
+            persona=None if f_persona_code == "All" else f_persona_code,
             search=(search.strip() or None),
         )
     except TypeError:
+        # 兼容不支持 persona 参数的旧版
         rows = fetch_history(
             username=username,
             limit=limit,
@@ -905,6 +993,9 @@ elif page == "History":
             target_lang=None if f_target == "All" else f_target,
             search=(search.strip() or None),
         )
+        # 如果旧版没有 persona 过滤，则在这里本地过滤
+        if f_persona_code != "All":
+            rows = [r for r in rows if (r.get("persona") or r.get("extra", {}).get("persona")) == f_persona_code]
     except Exception as e:
         st.warning(f"History load failed: {e}")
 
@@ -920,9 +1011,14 @@ elif page == "History":
                 ts_s = str(ts)
 
             mode_val = r.get("mode", r.get("feature", ""))
-            src_lbl = disp.get(r.get("source_lang", ""), r.get("source_lang", ""))
-            tgt_lbl = disp.get(r.get("target_lang", ""), r.get("target_lang", ""))
-            title = f"{ts_s} • {mode_val} • {src_lbl} → {tgt_lbl} • {r.get('persona','')}"
+            src = r.get("source_lang", "")
+            tgt = r.get("target_lang", "")
+            src_lbl = disp.get(src, src)
+            tgt_lbl = disp.get(tgt, tgt)
+            pcode = r.get("persona") or r.get("extra", {}).get("persona") or ""
+            persona_lbl = persona_display(pcode) if pcode else ""
+            title = f"{ts_s} • {mode_val} • {src_lbl} → {tgt_lbl} • {persona_lbl}"
+
             st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
             st.markdown(f"**{title}**")
             with st.expander("Input"):
@@ -934,9 +1030,9 @@ elif page == "History":
                 except Exception:
                     st.markdown(out)
             st.caption(
-                f'{t("model_info_prefix")}: {r.get("model")} • '
-                f'Tokens(in/out): {r.get("tokens_input")}/{r.get("tokens_output")} • '
-                f'Latency: {r.get("latency_ms")} ms'
+                f'{t("model_info_prefix")}: {r.get("model","-")} • '
+                f'Tokens(in/out): {r.get("tokens_input","-")}/{r.get("tokens_output","-")} • '
+                f'Latency: {r.get("latency_ms","-")} ms'
             )
             st.markdown("</div>", unsafe_allow_html=True)
 

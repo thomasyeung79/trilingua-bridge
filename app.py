@@ -1,5 +1,6 @@
 import json
 import time
+import inspect
 from typing import Dict, Any, Optional, Callable, Tuple
 
 import streamlit as st
@@ -25,12 +26,9 @@ try:
 except Exception as e:
     st.warning(f"Database init failed: {e}")
 
-# ----------------------- UI Text -----------------------
-UI_LANGS = ["English", "简体中文", "한국어"]
-STUDY_LANG_CODES = ["zh", "ko", "en"]
-
-UI_TEXT: Dict[str, Dict[str, str]] = {
-    "English": {
+# ----------------------- i18n & Personas -----------------------
+TEXTS = {
+    "en": {
         "app_title": "TriLingua Bridge",
         "subtitle": "AI Language & Cross-Cultural Communication Assistant",
         "not_social": "This is not a social app. It is an AI assistant for real conversations.",
@@ -104,8 +102,21 @@ UI_TEXT: Dict[str, Dict[str, str]] = {
         "more_tools": "More Tools",
         "more_tools_sub": "Translation, grammar, natural expression, vocabulary, and tone analysis.",
         "tip": "Explanations use your native language; examples and rewrites use the target language.",
+        "detected_source": "Detected source language",
+        "input_label": "Input",
+        "output_label": "Output",
+        "levels": ["Beginner", "Intermediate", "Advanced"],
+        "tones": ["Neutral", "Polite", "Casual", "Formal"],
+        "personas": {
+            "friendly_chat": "Friendly Chat Partner",
+            "teacher": "Language Teacher",
+            "workplace": "Workplace Assistant",
+            "travel": "Travel Buddy",
+            "pop_culture": "Pop Culture Friend",
+        },
+        "swap": "Swap",
     },
-    "简体中文": {
+    "zh": {
         "app_title": "TriLingua Bridge",
         "subtitle": "AI 语言与跨文化沟通助手",
         "not_social": "这不是社交应用，而是用于真实沟通的 AI 助手。",
@@ -179,8 +190,21 @@ UI_TEXT: Dict[str, Dict[str, str]] = {
         "more_tools": "更多工具",
         "more_tools_sub": "翻译、语法、地道表达、词汇和语气分析。",
         "tip": "说明使用你的母语；示例与改写使用目标语言。",
+        "detected_source": "检测到的源语言",
+        "input_label": "输入",
+        "output_label": "输出",
+        "levels": ["入门", "中级", "高级"],
+        "tones": ["中性", "礼貌", "随意", "正式"],
+        "personas": {
+            "friendly_chat": "友好聊天伙伴",
+            "teacher": "语言老师",
+            "workplace": "职场助手",
+            "travel": "旅行搭子",
+            "pop_culture": "流行文化好友",
+        },
+        "swap": "切换",
     },
-    "한국어": {
+    "ko": {
         "app_title": "TriLingua Bridge",
         "subtitle": "AI 언어 · 다문화 커뮤니케이션 도우미",
         "not_social": "이 앱은 소셜 앱이 아니라 실제 대화를 위한 AI 도우미입니다.",
@@ -254,75 +278,124 @@ UI_TEXT: Dict[str, Dict[str, str]] = {
         "more_tools": "추가 도구",
         "more_tools_sub": "번역, 문법, 자연스러운 표현, 어휘, 말투 분석.",
         "tip": "설명은 모국어로, 예문/재작성은 학습 언어로 제공합니다.",
+        "detected_source": "감지된 원문 언어",
+        "input_label": "입력",
+        "output_label": "출력",
+        "levels": ["초급", "중급", "고급"],
+        "tones": ["중립", "공손", "캐주얼", "격식"],
+        "personas": {
+            "friendly_chat": "친근한 채팅 파트너",
+            "teacher": "언어 선생님",
+            "workplace": "직장 도우미",
+            "travel": "여행 친구",
+            "pop_culture": "팝컬처 친구",
+        },
+        "swap": "바꾸기",
     },
 }
 
-LANG_DISPLAY = {
-    "English": {"zh": "Chinese (中文)", "ko": "Korean (한국어)", "en": "English"},
-    "简体中文": {"zh": "中文", "ko": "韩语", "en": "英语"},
-    "한국어": {"zh": "중국어", "ko": "한국어", "en": "영어"},
+UI_LANGS = ["en", "zh", "ko"]
+UI_LANG_DISPLAY = {"en": "English", "zh": "简体中文", "ko": "한국어"}
+
+# 学习语言代码（与内容相关，不随 UI 变化）
+STUDY_LANG_CODES = ["zh", "ko", "en"]
+
+# 语言显示（随 UI 语言变化）
+LANG_DISPLAY_BY_UI = {
+    "en": {"zh": "Chinese (中文)", "ko": "Korean (한국어)", "en": "English"},
+    "zh": {"zh": "中文", "ko": "韩语", "en": "英语"},
+    "ko": {"zh": "중국어", "ko": "한국어", "en": "영어"},
 }
 
-PERSONA_LABELS = {
-    "English": {
-        "korean_friend": "Korean Friend",
-        "korean_teacher": "Korean Teacher",
-        "workplace": "Workplace Assistant",
-        "travel": "Travel Assistant",
-        "kpop_friend": "K-pop Fan Friend",
-    },
-    "简体中文": {
-        "korean_friend": "韩国朋友",
-        "korean_teacher": "韩语老师",
-        "workplace": "职场助手",
-        "travel": "旅行助手",
-        "kpop_friend": "K-pop粉丝朋友",
-    },
-    "한국어": {
-        "korean_friend": "한국인 친구",
-        "korean_teacher": "한국어 선생님",
-        "workplace": "직장 도우미",
-        "travel": "여행 도우미",
-        "kpop_friend": "K-pop 팬 친구",
-    },
-}
-PERSONA_CODES = ["korean_friend", "korean_teacher", "workplace", "travel", "kpop_friend"]
+# Personas（语言中立）
+PERSONA_CODES = ["friendly_chat", "teacher", "workplace", "travel", "pop_culture"]
 
-# ----------------------- Helpers -----------------------
+# Canonical values for level/tone
+LEVEL_VALUES = ["beginner", "intermediate", "advanced"]
+TONE_VALUES = ["neutral", "polite", "casual", "formal"]
+
+
 def t(key: str) -> str:
-    lang = st.session_state.get("ui_lang", "English")
-    return UI_TEXT.get(lang, UI_TEXT["English"]).get(key, UI_TEXT["English"].get(key, key))
+    code = st.session_state.get("ui_lang", "en")
+    return TEXTS.get(code, TEXTS["en"]).get(key, TEXTS["en"].get(key, key))
+
 
 def get_lang_display() -> Dict[str, str]:
-    return LANG_DISPLAY.get(st.session_state.get("ui_lang", "English"), LANG_DISPLAY["English"])
+    return LANG_DISPLAY_BY_UI.get(st.session_state.get("ui_lang", "en"), LANG_DISPLAY_BY_UI["en"])
+
 
 def persona_display(code: str) -> str:
-    ui = st.session_state.get("ui_lang", "English")
-    return PERSONA_LABELS.get(ui, PERSONA_LABELS["English"]).get(code, code)
+    ui = st.session_state.get("ui_lang", "en")
+    return TEXTS.get(ui, TEXTS["en"]).get("personas", {}).get(code, code)
 
+
+def local_levels():
+    ui = st.session_state.get("ui_lang", "en")
+    opts = TEXTS[ui]["levels"]
+    mapping = dict(zip(opts, LEVEL_VALUES))
+    return opts, mapping
+
+
+def local_tones():
+    ui = st.session_state.get("ui_lang", "en")
+    opts = TEXTS[ui]["tones"]
+    mapping = dict(zip(opts, TONE_VALUES))
+    return opts, mapping
+
+
+def build_persona_profile(
+    code: str,
+    source_lang: str,
+    target_lang: str,
+    ui_lang: str,
+) -> Dict[str, Any]:
+    persona_base = {
+        "friendly_chat": "Warm, supportive, concise. Encourage natural conversation.",
+        "teacher": "Clear explanations, step-by-step scaffolding, gentle corrections.",
+        "workplace": "Professional, succinct, culturally sensitive to business norms.",
+        "travel": "Practical, friendly, phrase-focused, situational tips.",
+        "pop_culture": "Trendy, upbeat, slang-aware, context from media/internet.",
+    }.get(code, "Helpful, concise, culturally aware.")
+
+    if target_lang == "ko":
+        style = "Use Korean conversational norms (honorifics vs casual appropriately), short examples, and common set phrases."
+    elif target_lang == "zh":
+        style = "Use natural Chinese internet/chat style when appropriate, concise examples, and idiomatic expressions."
+    else:
+        style = "Use international English with an Australian-friendly tone; natural, idiomatic, and inclusive phrasing."
+
+    meta_lang = {
+        "en": "Explain meta-notes in English.",
+        "zh": "说明和提示请使用中文表达。",
+        "ko": "설명과 주석은 한국어로 작성하세요.",
+    }.get(ui_lang, "")
+
+    return {
+        "code": code,
+        "name": TEXTS.get(ui_lang, TEXTS["en"]).get("personas", {}).get(code, code),
+        "style_hint": f"{persona_base} {style} {meta_lang}".strip(),
+        "lang_context": {"source": source_lang, "target": target_lang, "ui": ui_lang},
+    }
+
+
+def safe_call(func: Callable, kwargs: Dict[str, Any]):
+    sig = inspect.signature(func)
+    params = sig.parameters
+    k = dict((kk, vv) for kk, vv in kwargs.items() if kk in params)
+    if "persona_profile" not in params and "persona" in params and "persona_profile" in kwargs:
+        prof = kwargs["persona_profile"]
+        k["persona"] = f"{prof.get('code','')} | {prof.get('name','')} | {prof.get('style_hint','')}"
+    return func(**k)
+
+
+# ----------------------- Helpers -----------------------
 def safe_rerun():
     st.rerun()
+
 
 def now_ms() -> int:
     return int(time.time() * 1000)
 
-def call_translate(
-    text: str,
-    source_lang: str,
-    target_lang: str,
-    native_lang: str,
-    temperature: float,
-    model: str,
-):
-    result, usage, detected = translate_text(
-        text=text,
-        source_lang=source_lang,
-        target_lang=target_lang,
-        native_lang=native_lang,
-        temperature=temperature,
-        model=model,
-    )
-    return result, usage or {}, detected
 
 def insert_history_safe(
     username: str,
@@ -344,7 +417,7 @@ def insert_history_safe(
             source_lang=source_lang,
             target_lang=target_lang,
             native_lang=native_lang,
-            persona=persona_code,  # 保存 persona_code，展示时再映射
+            persona=persona_code,
             ui_lang=ui_lang,
             user_input=user_input,
             ai_output=ai_output,
@@ -354,7 +427,6 @@ def insert_history_safe(
             latency_ms=latency_ms,
         )
     except TypeError:
-        # 兼容旧版签名
         insert_history(
             username=username,
             feature=mode,
@@ -373,6 +445,7 @@ def insert_history_safe(
     except Exception as e:
         st.warning(f"History save failed: {e}")
 
+
 def show_model_caption(usage: Dict[str, Any], latency_ms: int):
     model = usage.get("model") or "-"
     pt = usage.get("prompt_tokens")
@@ -384,6 +457,7 @@ def show_model_caption(usage: Dict[str, Any], latency_ms: int):
         f'Tokens(in/out): {pt}/{ct} • '
         f'Latency: {latency_ms} ms'
     )
+
 
 def inject_css():
     st.markdown(
@@ -408,6 +482,7 @@ def inject_css():
         unsafe_allow_html=True,
     )
 
+
 def hero(title: str, subtitle: str, note: Optional[str] = None):
     st.markdown('<div class="hero">', unsafe_allow_html=True)
     st.markdown(f"<h1>{title}</h1>", unsafe_allow_html=True)
@@ -415,6 +490,7 @@ def hero(title: str, subtitle: str, note: Optional[str] = None):
     if note:
         st.caption(note)
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 def section_header(title: str, subtitle: str = "", accent: str = "purple"):
     cls = {"blue": "accent-blue", "green": "accent-green", "purple": "accent-purple"}.get(accent, "accent-purple")
@@ -424,15 +500,18 @@ def section_header(title: str, subtitle: str = "", accent: str = "purple"):
         st.caption(subtitle)
     st.markdown("</div>", unsafe_allow_html=True)
 
+
 def feature_button(icon: str, title: str, desc: str, nav_page: str, key: str):
     if st.button(f"{icon}  {title}\n\n{desc}", key=key, use_container_width=True):
         st.session_state.page = nav_page
         safe_rerun()
 
+
 def back_home_button():
     if st.button(f"🏠 {t('back_home')}", use_container_width=True):
         st.session_state.page = "Home"
         safe_rerun()
+
 
 def run_ai_task(
     task_fn: Callable[..., Tuple[str, Dict[str, Any]]],
@@ -443,10 +522,12 @@ def run_ai_task(
     try:
         result = None
         usage = {}
-        out = task_fn(**task_kwargs)
-        # 兼容不同函数返回：(result, usage) 或 (result, usage, detected)
+        out = safe_call(task_fn, task_kwargs)
         if isinstance(out, tuple) and len(out) == 3:
             result, usage, detected = out
+            if detected:
+                usage = usage or {}
+                usage["detected_lang"] = detected
             history_kwargs["source_lang"] = detected or history_kwargs.get("source_lang")
         elif isinstance(out, tuple) and len(out) == 2:
             result, usage = out
@@ -461,10 +542,13 @@ def run_ai_task(
 
     st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
     try:
-        # 如果是 JSON 结构也能优雅显示
         st.json(json.loads(result))
     except Exception:
         st.markdown(result)
+    if usage.get("detected_lang"):
+        disp = get_lang_display()
+        det = usage["detected_lang"]
+        st.caption(f"{t('detected_source')}: {disp.get(det, det)}")
     show_model_caption(usage, latency_ms)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -482,11 +566,12 @@ def run_ai_task(
         latency_ms=latency_ms,
     )
 
+
 # ----------------------- State -----------------------
 inject_css()
 
 if "ui_lang" not in st.session_state:
-    st.session_state.ui_lang = "English"
+    st.session_state.ui_lang = "en"
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 if "username" not in st.session_state:
@@ -503,14 +588,13 @@ if "model_input" not in st.session_state:
     st.session_state.model_input = "gpt-4o-mini"
 
 # ----------------------- Sidebar -----------------------
-ui_lang_selected = st.sidebar.selectbox(
-    UI_TEXT[st.session_state.ui_lang]["ui_language"],
-    UI_LANGS,
-    index=UI_LANGS.index(st.session_state.ui_lang),
-    key="ui_lang_select",
-)
-if ui_lang_selected != st.session_state.ui_lang:
-    st.session_state.ui_lang = ui_lang_selected
+ui_label = TEXTS[st.session_state.ui_lang]["ui_language"]
+ui_options = [UI_LANG_DISPLAY[c] for c in UI_LANGS]
+cur_index = UI_LANGS.index(st.session_state.ui_lang)
+sel_label = st.sidebar.selectbox(ui_label, ui_options, index=cur_index, key="ui_lang_select")
+sel_code = UI_LANGS[ui_options.index(sel_label)]
+if sel_code != st.session_state.ui_lang:
+    st.session_state.ui_lang = sel_code
     safe_rerun()
 
 st.sidebar.markdown(f'<div class="sb-title">{t("account_title")}</div>', unsafe_allow_html=True)
@@ -550,6 +634,17 @@ target_lang = st.sidebar.selectbox(
     format_func=lambda c: ld.get(c, c),
     key="target_lang",
 )
+
+col_swap_a, col_swap_b = st.sidebar.columns(2)
+with col_swap_a:
+    if st.button(f"⇄ {t('swap')}", use_container_width=True, key="swap_langs"):
+        st.session_state.native_lang, st.session_state.target_lang = (
+            st.session_state.target_lang, st.session_state.native_lang
+        )
+        safe_rerun()
+with col_swap_b:
+    pass
+
 persona_code = st.sidebar.selectbox(
     t("persona"),
     PERSONA_CODES,
@@ -658,8 +753,14 @@ elif page in ["Say", "Translate"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=source_choice,
+                target_lang=target_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=call_translate,
+                task_fn=translate_text,
                 task_kwargs=dict(
                     text=text,
                     source_lang=source_choice,
@@ -667,6 +768,7 @@ elif page in ["Say", "Translate"]:
                     native_lang=native_lang,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -711,10 +813,15 @@ elif page in ["Mean", "Coach", "Kpop"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            # Mean/Coach -> 输出到母语；Kpop -> 输出到学习语言
             out_lang = native_lang if page in ["Mean", "Coach"] else target_lang
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=source_choice,
+                target_lang=out_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=call_translate,
+                task_fn=translate_text,
                 task_kwargs=dict(
                     text=text,
                     source_lang=source_choice,
@@ -722,6 +829,7 @@ elif page in ["Mean", "Coach", "Kpop"]:
                     native_lang=native_lang,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -757,19 +865,22 @@ elif page == "Chat":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            def _chat_wrapper(**kwargs):
-                r, u, detected = chat_reply_assistant(**kwargs)
-                return r, u, detected
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=source_choice,
+                target_lang=target_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=_chat_wrapper,
+                task_fn=chat_reply_assistant,
                 task_kwargs=dict(
                     text=text,
                     source_lang=source_choice,
                     target_lang=target_lang,
                     native_lang=native_lang,
-                    persona=persona_code,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -791,7 +902,9 @@ elif page == "Grammar":
     st.markdown("</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        level = st.selectbox(t("learner_level"), ["Beginner", "Intermediate", "Advanced"], index=1)
+        levels, level_map = local_levels()
+        level_label = st.selectbox(t("learner_level"), levels, index=1)
+        level_code = level_map[level_label]
     with c2:
         run_btn = st.button(t("correct_btn"), use_container_width=True)
 
@@ -799,19 +912,22 @@ elif page == "Grammar":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            def _wrap(**kwargs):
-                r, u = correct_grammar(**kwargs)
-                return r, u
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=target_lang,
+                target_lang=target_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=_wrap,
+                task_fn=correct_grammar,
                 task_kwargs=dict(
                     text=text,
                     target_lang=target_lang,
                     native_lang=native_lang,
-                    level=level.lower(),
-                    persona=persona_code,
+                    level=level_code,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -833,7 +949,9 @@ elif page == "Natural":
     st.markdown("</div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        tone_pref = st.selectbox(t("desired_tone"), ["Neutral", "Polite", "Casual", "Formal"], index=0)
+        tones, tone_map = local_tones()
+        tone_label = st.selectbox(t("desired_tone"), tones, index=0)
+        tone_code = tone_map[tone_label]
     with c2:
         run_btn = st.button(t("suggest_btn"), use_container_width=True)
 
@@ -841,19 +959,22 @@ elif page == "Natural":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            def _wrap(**kwargs):
-                r, u = suggest_natural_expression(**kwargs)
-                return r, u
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=target_lang,
+                target_lang=target_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=_wrap,
+                task_fn=suggest_natural_expression,
                 task_kwargs=dict(
                     text=text,
                     target_lang=target_lang,
                     native_lang=native_lang,
-                    tone_preference=tone_pref.lower(),
-                    persona=persona_code,
+                    tone_preference=tone_code,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -883,19 +1004,22 @@ elif page == "Vocabulary":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            def _wrap(**kwargs):
-                r, u = explain_vocabulary(**kwargs)
-                return r, u
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang="auto",
+                target_lang=target_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=_wrap,
+                task_fn=explain_vocabulary,
                 task_kwargs=dict(
                     text=text,
                     target_lang=target_lang,
                     native_lang=native_lang,
                     max_items=max_items,
-                    persona=persona_code,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -930,18 +1054,21 @@ elif page == "Tone":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            def _wrap(**kwargs):
-                r, u = analyze_tone(**kwargs)
-                return r, u
+            persona_prof = build_persona_profile(
+                code=persona_code,
+                source_lang=tone_lang,
+                target_lang=tone_lang,
+                ui_lang=st.session_state.ui_lang,
+            )
             run_ai_task(
-                task_fn=_wrap,
+                task_fn=analyze_tone,
                 task_kwargs=dict(
                     text=text,
                     lang=tone_lang,
                     native_lang=native_lang,
-                    persona=persona_code,
                     temperature=temperature,
                     model=model,
+                    persona_profile=persona_prof,
                 ),
                 history_kwargs=dict(
                     username=username,
@@ -984,7 +1111,6 @@ elif page == "History":
             search=(search.strip() or None),
         )
     except TypeError:
-        # 兼容不支持 persona 参数的旧版
         rows = fetch_history(
             username=username,
             limit=limit,
@@ -993,7 +1119,6 @@ elif page == "History":
             target_lang=None if f_target == "All" else f_target,
             search=(search.strip() or None),
         )
-        # 如果旧版没有 persona 过滤，则在这里本地过滤
         if f_persona_code != "All":
             rows = [r for r in rows if (r.get("persona") or r.get("extra", {}).get("persona")) == f_persona_code]
     except Exception as e:
@@ -1006,7 +1131,7 @@ elif page == "History":
         for r in rows:
             ts = r.get("timestamp")
             if isinstance(ts, (int, float)):
-                ts_s = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts / 1000 if ts > 1e12 else ts))
+                ts_s = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts / 1000 if ts and ts > 1e12 else (ts or 0)))
             else:
                 ts_s = str(ts)
 
@@ -1021,9 +1146,9 @@ elif page == "History":
 
             st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
             st.markdown(f"**{title}**")
-            with st.expander("Input"):
+            with st.expander(t("input_label")):
                 st.write(r.get("user_input", ""))
-            with st.expander("Output"):
+            with st.expander(t("output_label")):
                 out = r.get("ai_output") or ""
                 try:
                     st.json(json.loads(out))

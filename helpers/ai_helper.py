@@ -89,8 +89,8 @@ def _lang_name(code: str) -> str:
 def detect_lang_code(text: str) -> str:
     """
     Lightweight heuristic detector for ['zh', 'ko', 'en'].
-    - Counts Hangul and Han characters; otherwise falls back to 'en'.
     """
+
     if not text or not text.strip():
         return "en"
 
@@ -102,15 +102,18 @@ def detect_lang_code(text: str) -> str:
     c_count = len(han)
     l_count = len(latin)
 
-    # Prefer strongest signal among Hangul / Han
-    if h_count >= max(c_count, 5) and h_count >= 2:
+    # Korean
+    if h_count >= 2 and h_count > c_count:
         return "ko"
-    if c_count >= max(h_count, 5) and c_count >= 2:
+
+    # Chinese
+    if c_count >= 2 and c_count > h_count:
         return "zh"
-    # Otherwise default to English if it looks Latin-ish
+
+    # English
     if l_count >= 1:
         return "en"
-    # Default fallback
+
     return "en"
 
 def _mk_system(native_lang: str, target_lang: Optional[str] = None) -> str:

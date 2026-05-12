@@ -614,6 +614,8 @@ elif page == "Say":
             
             start = now_ms()
 
+            st.write("DEBUG:", source_lang, target_lang, native_lang)
+
             result, usage = translate_text(
                 text=text,
                 source_lang=source_lang,

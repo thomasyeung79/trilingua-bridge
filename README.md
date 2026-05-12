@@ -1,72 +1,135 @@
-TriLingua Bridge
+# TriLingua Bridge AI
+## 语言与跨文化沟通助手（中 / 韩 / 英）
 
-AI Language & Cross-Cultural Communication Assistant for Chinese, Korean, and English.
-This is not a social app; it’s an AI assistant that helps you with real conversations.
+一个基于 Python + Streamlit + OpenAI 的多语言 AI 沟通平台，支持中文、韩语、英语之间的翻译、学习与跨文化交流。
 
-Features
-- Core modes:
-  - What I Want to Say: multiple versions (direct, natural, young/casual, polite, close-friend) + tone notes
-  - What Does This Mean?: literal vs natural meaning, hidden tone, vibe, how to interpret, how to reply
-  - AI Chat Coach: analyze a snippet, what to avoid, good patterns, recommended reply
-  - K-pop / K-drama Context: EN/ZH meaning, word breakdown, grammar, natural usage, casual example, cultural note
-- Tools:
-  - Chat Reply Assistant
-  - Translation
-  - Grammar Correction
-  - Natural Expression
-  - Vocabulary Explanation
-  - Tone Analysis
-- History: user-isolated records stored in SQLite
-- Multilingual UI: English, 简体中文, 한국어
-- Personas, creativity (temperature), and model override
+---
 
-Architecture
-- Streamlit frontend (app.py)
-- ai_helper.py: LLM prompts and OpenAI API calls
-- db.py: SQLite storage
-- .env configuration via python-dotenv
+# 功能 Features
 
-Quickstart
-1) Requirements
-- Python 3.9+ recommended
-- pip install -r requirements.txt (or install packages below)
+- 全面多语言 UI（English / 简体中文 / 한국어）
+- 语言中立人格系统
+  - 友好聊天
+  - 语言老师
+  - 职场助手
+  - 旅行模式
+  - 流行文化模式
+- 发音显示
+  - 中文拼音（Pinyin）
+  - 韩语罗马音（Romanization）
+  - 英语 IPA
+- 一键播放发音（gTTS）
+- 语音输入与转写（OpenAI Whisper）
+- AI 翻译
+- 语法纠正
+- 地道表达优化
+- 词汇讲解
+- 语气分析
+- 聊天回复助手
+- SQLite 用户数据隔离
 
-Minimal requirements.txt
-streamlit>=1.30
-python-dotenv>=1.0.0
-openai>=1.0.0
+---
 
-2) Environment variables
-Create a .env file in the project root:
+# 技术栈 Tech Stack
+
+- Python
+- Streamlit
+- OpenAI API
+- SQLite
+- gTTS
+- Whisper API
+
+---
+
+# 快速开始 Quick Start
+
+## 1. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 2. 配置 API Key 与数据库
+
+### 方式 A：使用 `.env`
+
+项目根目录创建：
+
+```env
 OPENAI_API_KEY=sk-...
-# Optional overrides:
-# OPENAI_MODEL=gpt-4o-mini
-# OPENAI_BASE_URL=https://api.openai.com/v1
-# DB_PATH=trilingua.db
+DB_PATH=trilingua.db
+```
 
-3) Initialize and run
-- Ensure db.py and ai_helper.py are in the same directory as app.py
-- Run:
-  streamlit run app.py
+---
 
-4) Login model
-- The app uses a simple “username” field to separate history. No password/auth backend here.
-- Each user only sees their own records.
+### 方式 B：使用 `.streamlit/secrets.toml`
 
-Notes and tips
-- Explanations are produced in your native language (sidebar preference).
-- Examples and rewrites are produced in your target language.
-- You can override the model in the sidebar (defaults to gpt-4o-mini). Any chat-completions-capable model should work.
-- If you need to use a compatible proxy or different provider, set OPENAI_BASE_URL accordingly.
+```toml
+OPENAI_API_KEY = "sk-..."
+DB_PATH = "trilingua.db"
+```
 
-Data storage
-- SQLite DB (DB_PATH/.env) with a single history table
-- Fields: username, timestamp, mode, langs, persona, ui_lang, user_input, ai_output, token usage, model, latency
+---
 
-Troubleshooting
-- Missing OPENAI_API_KEY: set it in .env and restart.
-- openai module not found: pip install openai>=1.0.0
-- Database file permission issues: adjust DB_PATH or directory permissions.
+## 3. 运行项目
 
-License
-- For personal and educational use. Review your model provider’s terms for API usage and data handling.
+```bash
+streamlit run app.py
+```
+
+---
+
+# 使用说明 Notes
+
+- 没有 `OPENAI_API_KEY` 时：
+  - AI 输出为本地模拟
+  - Whisper 语音转写不可用
+  - 应用仍可正常运行
+
+- TTS 使用 gTTS
+  - 浏览器内直接播放 MP3
+
+- 语音输入支持：
+  - wav
+  - mp3
+  - m4a
+  - webm
+
+- 历史记录按用户名隔离存储
+
+---
+
+# 项目结构 Project Structure
+
+```text
+project/
+│
+├── app.py               # 主应用入口
+├── ui_helper.py         # UI 与多语言文本
+├── ai_helper.py         # OpenAI 与人格系统
+├── db_helper.py         # SQLite 数据库
+├── audio_helper.py      # TTS / STT / 发音处理
+├── requirements.txt
+└── README.md
+```
+
+---
+
+# 未来计划 Roadmap
+
+- Apple Health 风格 UI
+- 韩语学习模式增强
+- 多用户云端数据库
+- AI 对话记忆
+- 实时语音聊天
+- 移动端适配
+
+---
+
+# 作者 Author
+
+Thomas Yeung  
+Master of IT (Applied AI)  
+Sydney, Australia

@@ -3,7 +3,7 @@ import sqlite3
 import time
 from typing import Any, Dict, List, Optional
 
-DB_PATH = os.getenv("DB_PATH", "trilingua.db")
+DB_PATH = os.getenv("DB_PATH", "trilingua_v2.db")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS history (

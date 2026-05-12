@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Dict, Any, Callable, Tuple, Optional
+from typing import Dict, Any, Callable, Optional
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -43,10 +43,6 @@ from audio_helper import (
 )
 
 
-# =========================
-# Boot
-# =========================
-
 load_dotenv()
 
 st.set_page_config(
@@ -56,10 +52,6 @@ st.set_page_config(
 
 inject_css()
 
-
-# =========================
-# Session State
-# =========================
 
 def init_state():
     defaults = {
@@ -82,19 +74,11 @@ def init_state():
 init_state()
 
 
-# =========================
-# Database Init
-# =========================
-
 try:
     init_db()
 except Exception as e:
     st.warning(f"{t('db_init_failed')}: {e}")
 
-
-# =========================
-# Helper Functions
-# =========================
 
 def go_home_button():
     if st.button(f"🏠 {t('back_home')}", use_container_width=True):
@@ -102,10 +86,7 @@ def go_home_button():
         st.rerun()
 
 
-def get_persona_profile(
-    source_lang: str,
-    target_lang: str,
-) -> Dict[str, Any]:
+def get_persona_profile(source_lang: str, target_lang: str) -> Dict[str, Any]:
     return build_persona_profile(
         code=st.session_state.persona_code,
         source_lang=source_lang,
@@ -176,14 +157,13 @@ def run_ai_task(
         st.markdown(f"**{t('pronunciation_label')}**")
         st.write(to_pronunciation(result, output_lang_for_pron))
 
-        if st.button(t("play_pron")):
-            with st.spinner(t("playing_audio")):
-                audio_bytes = synthesize_tts(result, output_lang_for_pron)
+        with st.spinner(t("playing_audio")):
+            audio_bytes = synthesize_tts(result, output_lang_for_pron)
 
-            if audio_bytes:
-                st.audio(audio_bytes, format="audio/mp3")
-            else:
-                st.warning(t("tts_not_supported"))
+        if audio_bytes:
+            st.audio(audio_bytes, format="audio/mp3")
+        else:
+            st.warning(t("tts_not_supported"))
 
     show_model_caption(usage, latency_ms)
 
@@ -256,10 +236,6 @@ def voice_input_ui(text_area_key: str):
             else:
                 st.warning(t("stt_unavailable"))
 
-
-# =========================
-# Sidebar
-# =========================
 
 ui_label = TEXTS[st.session_state.ui_lang]["ui_language"]
 ui_options = [UI_LANG_DISPLAY[code] for code in UI_LANGS]
@@ -378,10 +354,6 @@ st.sidebar.checkbox(
 st.sidebar.info(t("tip"))
 
 
-# =========================
-# Navigation
-# =========================
-
 NAV_ITEMS = [
     ("Home", f"🏠 {t('nav_home')}"),
     ("Say", f"🗣️ {t('mode_say')}"),
@@ -420,10 +392,6 @@ if selected_page != st.session_state.page:
 page = st.session_state.page
 username = st.session_state.username
 
-
-# =========================
-# Page: Home
-# =========================
 
 if page == "Home":
     hero(t("app_title"), t("subtitle"), t("not_social"))
@@ -497,10 +465,6 @@ if page == "Home":
         st.rerun()
 
 
-# =========================
-# Page: Say / Translate
-# =========================
-
 elif page in ["Say", "Translate"]:
     go_home_button()
 
@@ -545,10 +509,7 @@ elif page in ["Say", "Translate"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                source_choice,
-                target_lang,
-            )
+            persona_profile = get_persona_profile(source_choice, target_lang)
 
             run_ai_task(
                 task_fn=translate_text,
@@ -574,10 +535,6 @@ elif page in ["Say", "Translate"]:
                 pron_lang=target_lang,
             )
 
-
-# =========================
-# Page: Mean / Coach / Kpop
-# =========================
 
 elif page in ["Mean", "Coach", "Kpop"]:
     go_home_button()
@@ -636,41 +593,61 @@ elif page in ["Mean", "Coach", "Kpop"]:
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            output_lang = native_lang if page in ["Mean", "Coach"] else target_lang
+            if page == "Coach":
+                persona_profile = get_persona_profile(source_choice, target_lang)
 
-            persona_profile = get_persona_profile(
-                source_choice,
-                output_lang,
-            )
+                run_ai_task(
+                    task_fn=chat_reply_assistant,
+                    task_kwargs=dict(
+                        text=text,
+                        source_lang=source_choice,
+                        target_lang=target_lang,
+                        native_lang=native_lang,
+                        temperature=temperature,
+                        model=model,
+                        persona_profile=persona_profile,
+                    ),
+                    history_kwargs=dict(
+                        username=username,
+                        mode="coach",
+                        source_lang=source_choice,
+                        target_lang=target_lang,
+                        native_lang=native_lang,
+                        persona_code=persona_code,
+                        ui_lang=st.session_state.ui_lang,
+                        user_input=text,
+                    ),
+                    pron_lang=target_lang,
+                )
 
-            run_ai_task(
-                task_fn=translate_text,
-                task_kwargs=dict(
-                    text=text,
-                    source_lang=source_choice,
-                    target_lang=output_lang,
-                    native_lang=native_lang,
-                    temperature=temperature,
-                    model=model,
-                    persona_profile=persona_profile,
-                ),
-                history_kwargs=dict(
-                    username=username,
-                    mode=mode_map[page],
-                    source_lang=source_choice,
-                    target_lang=output_lang,
-                    native_lang=native_lang,
-                    persona_code=persona_code,
-                    ui_lang=st.session_state.ui_lang,
-                    user_input=text,
-                ),
-                pron_lang=output_lang,
-            )
+            else:
+                output_lang = native_lang if page == "Mean" else target_lang
+                persona_profile = get_persona_profile(source_choice, output_lang)
 
+                run_ai_task(
+                    task_fn=translate_text,
+                    task_kwargs=dict(
+                        text=text,
+                        source_lang=source_choice,
+                        target_lang=output_lang,
+                        native_lang=native_lang,
+                        temperature=temperature,
+                        model=model,
+                        persona_profile=persona_profile,
+                    ),
+                    history_kwargs=dict(
+                        username=username,
+                        mode=mode_map[page],
+                        source_lang=source_choice,
+                        target_lang=output_lang,
+                        native_lang=native_lang,
+                        persona_code=persona_code,
+                        ui_lang=st.session_state.ui_lang,
+                        user_input=text,
+                    ),
+                    pron_lang=output_lang,
+                )
 
-# =========================
-# Page: Chat
-# =========================
 
 elif page == "Chat":
     go_home_button()
@@ -705,10 +682,7 @@ elif page == "Chat":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                source_choice,
-                target_lang,
-            )
+            persona_profile = get_persona_profile(source_choice, target_lang)
 
             run_ai_task(
                 task_fn=chat_reply_assistant,
@@ -735,10 +709,6 @@ elif page == "Chat":
             )
 
 
-# =========================
-# Page: Grammar
-# =========================
-
 elif page == "Grammar":
     go_home_button()
 
@@ -764,10 +734,7 @@ elif page == "Grammar":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                target_lang,
-                target_lang,
-            )
+            persona_profile = get_persona_profile(target_lang, target_lang)
 
             run_ai_task(
                 task_fn=correct_grammar,
@@ -793,10 +760,6 @@ elif page == "Grammar":
                 pron_lang=target_lang,
             )
 
-
-# =========================
-# Page: Natural
-# =========================
 
 elif page == "Natural":
     go_home_button()
@@ -827,10 +790,7 @@ elif page == "Natural":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                target_lang,
-                target_lang,
-            )
+            persona_profile = get_persona_profile(target_lang, target_lang)
 
             run_ai_task(
                 task_fn=suggest_natural_expression,
@@ -856,10 +816,6 @@ elif page == "Natural":
                 pron_lang=target_lang,
             )
 
-
-# =========================
-# Page: Vocabulary
-# =========================
 
 elif page == "Vocabulary":
     go_home_button()
@@ -888,10 +844,7 @@ elif page == "Vocabulary":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                "auto",
-                target_lang,
-            )
+            persona_profile = get_persona_profile("auto", target_lang)
 
             run_ai_task(
                 task_fn=explain_vocabulary,
@@ -917,10 +870,6 @@ elif page == "Vocabulary":
                 pron_lang=target_lang,
             )
 
-
-# =========================
-# Page: Tone
-# =========================
 
 elif page == "Tone":
     go_home_button()
@@ -950,10 +899,7 @@ elif page == "Tone":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            persona_profile = get_persona_profile(
-                tone_lang,
-                tone_lang,
-            )
+            persona_profile = get_persona_profile(tone_lang, tone_lang)
 
             run_ai_task(
                 task_fn=analyze_tone,
@@ -978,10 +924,6 @@ elif page == "Tone":
                 pron_lang=tone_lang,
             )
 
-
-# =========================
-# Page: History
-# =========================
 
 elif page == "History":
     go_home_button()
@@ -1114,10 +1056,6 @@ elif page == "History":
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-
-# =========================
-# Page: About
-# =========================
 
 elif page == "About":
     go_home_button()

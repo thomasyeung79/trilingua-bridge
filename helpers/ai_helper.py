@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Tuple
 try:
     from openai import OpenAI
 except Exception:
-    OpenAI = None  # to allow import without SDK during static analysis
+    OpenAI = None  # allow import without SDK during static analysis
 
 # -------------- Model / Client setup --------------
 def get_default_model() -> str:
@@ -28,6 +28,14 @@ def _get_client() -> Any:
         return OpenAI(api_key=api_key, base_url=base_url)
     return OpenAI(api_key=api_key)
 
+def _extract_usage(resp: Any, fallback_model: str) -> Dict[str, Any]:
+    # Robust usage extraction across variants
+    model = getattr(resp, "model", None) or fallback_model
+    usage_obj = getattr(resp, "usage", None)
+    pt = getattr(usage_obj, "prompt_tokens", None) if usage_obj else None
+    ct = getattr(usage_obj, "completion_tokens", None) if usage_obj else None
+    return {"model": model, "prompt_tokens": pt, "completion_tokens": ct}
+
 def _chat(
     messages: List[Dict[str, str]],
     model: Optional[str] = None,
@@ -46,35 +54,12 @@ def _chat(
             temperature=float(temperature),
         )
         text = (resp.choices[0].message.content or "").strip()
-        usage = {
-            "model": resp.model if hasattr(resp, "model") else mdl,
-            "prompt_tokens": getattr(resp.usage, "prompt_tokens", None),
-            "completion_tokens": getattr(resp.usage, "completion_tokens", None),
-        }
+        usage = _extract_usage(resp, mdl)
         return text, usage
     except Exception as e:
-        # Fallback error text and empty usage
+        # Fallback error text and minimal usage
         err_msg = f"(AI error) {e}"
         return err_msg, {"model": mdl, "prompt_tokens": None, "completion_tokens": None}
-
-def mode_what_i_want_to_say(
-    text,
-    source_lang,
-    target_lang,
-    native_lang,
-    persona,
-    temperature,
-    model,
-):
-    result, usage = translate_text(
-        text=text,
-        source_lang=source_lang,
-        target_lang=target_lang,
-        native_lang=native_lang,
-        temperature=temperature,
-    )
-    detected = source_lang
-    return result, usage, detected
 
 # -------------- Language helpers --------------
 LANG_NAME = {
@@ -89,8 +74,8 @@ def _lang_name(code: str) -> str:
 def detect_lang_code(text: str) -> str:
     """
     Lightweight heuristic detector for ['zh', 'ko', 'en'].
+    Prefers the script with stronger signal; falls back to 'en'.
     """
-
     if not text or not text.strip():
         return "en"
 
@@ -102,20 +87,34 @@ def detect_lang_code(text: str) -> str:
     c_count = len(han)
     l_count = len(latin)
 
-    # Korean
-    if h_count >= 2 and h_count > c_count:
+    if h_count >= 2 and h_count >= c_count:
         return "ko"
-
-    # Chinese
     if c_count >= 2 and c_count > h_count:
         return "zh"
-
-    # English
     if l_count >= 1:
         return "en"
-
     return "en"
 
+# -------------- Persona helpers --------------
+# Internal map: persona_code -> prompt-facing label
+PERSONA_MAP = {
+    "korean_friend": "Korean Friend",
+    "korean_teacher": "Korean Teacher",
+    "workplace": "Workplace Assistant",
+    "travel": "Travel Assistant",
+    "kpop_friend": "K-pop Fan Friend",
+}
+
+def _persona_str(persona_or_code: Optional[str]) -> str:
+    """
+    Accepts either a code ('korean_friend') or a readable label ('Korean Friend').
+    Falls back to a friendly default if empty.
+    """
+    if not persona_or_code:
+        return "Korean Friend"
+    return PERSONA_MAP.get(persona_or_code, persona_or_code)
+
+# -------------- System prompt --------------
 def _mk_system(native_lang: str, target_lang: Optional[str] = None) -> str:
     """
     Build a concise system prompt that enforces:
@@ -134,7 +133,7 @@ def _mk_system(native_lang: str, target_lang: Optional[str] = None) -> str:
     base.append("- Do not add lengthy prefaces or disclaimers.")
     return "\n".join(base)
 
-# -------------- Common format helpers --------------
+# -------------- Output format helpers --------------
 def _mk_header(title: str) -> str:
     return f"## {title}\n"
 
@@ -150,11 +149,16 @@ def translate_text(
     temperature: float = 0.3,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any], str]:
+    """
+    Returns (result_text, usage_dict, detected_lang_code).
+    """
+    text = (text or "").strip()
     detected = detect_lang_code(text) if source_lang == "auto" else source_lang
     tgt_name = _lang_name(target_lang)
     det_name = _lang_name(detected)
 
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    # Remove the model-generated "Detected language" line to avoid duplication.
     usr = f"""
 Task: Translate the user's message into {tgt_name}, then extract key vocabulary.
 
@@ -162,10 +166,9 @@ User message (original):
 {text}
 
 Output requirements:
-1) Start with a one-line 'Detected language: {det_name}'.
-2) Section 'Translation ({tgt_name})' with a clear, natural translation. Use just {tgt_name}.
-3) Section 'Important vocabulary' (5–8 bullet items). For each item:
-   - Word/phrase (in {tgt_name} when appropriate, or the original if it's a source-locked term)
+1) Section 'Translation ({tgt_name})' with a clear, natural translation in {tgt_name}.
+2) Section 'Important vocabulary' (5–8 bullets). For each item:
+   - Headword (in {tgt_name} when appropriate, or original if it's a source-locked term)
    - Short gloss in {tgt_name}
    - One-sentence explanation in {_lang_name(native_lang)}
    - One short example sentence in {tgt_name}
@@ -178,12 +181,10 @@ Be concise and practical.
         temperature=temperature,
     )
 
-    # Prepend a tiny structured header for clarity
+    # Prepend a small header with detection info to keep structure consistent
     header = []
     header.append(_mk_header("Detected source language"))
     header.append(det_name + "\n")
-    header.append(_mk_header(f"Translation ({tgt_name})"))
-    # The model will include its own sections; keep ours minimal to avoid duplication
     result = "\n".join(header) + content
     return result, usage, detected
 
@@ -193,14 +194,15 @@ def correct_grammar(
     target_lang: str = "ko",
     native_lang: str = "en",
     level: str = "intermediate",
-    persona: str = "Korean Teacher",
+    persona: str = "korean_teacher",
     temperature: float = 0.3,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     tgt = _lang_name(target_lang)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Correct and improve the user's {tgt} sentence(s).
+Role: {role}. Correct and improve the user's {tgt} sentence(s).
 
 User text:
 {text}
@@ -225,14 +227,15 @@ def suggest_natural_expression(
     target_lang: str = "ko",
     native_lang: str = "en",
     tone_preference: str = "neutral",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.4,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     tgt = _lang_name(target_lang)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Rewrite to sound natural in {tgt}.
+Role: {role}. Rewrite to sound natural in {tgt}.
 
 Original:
 {text}
@@ -256,14 +259,15 @@ def explain_vocabulary(
     target_lang: str = "ko",
     native_lang: str = "en",
     max_items: int = 6,
-    persona: str = "Korean Teacher",
+    persona: str = "korean_teacher",
     temperature: float = 0.3,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     tgt = _lang_name(target_lang)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Extract up to {max_items} important vocabulary items relevant to the text.
+Role: {role}. Extract up to {max_items} important vocabulary items relevant to the text.
 Text:
 {text}
 
@@ -286,14 +290,15 @@ def analyze_tone(
     text: str,
     lang: str = "ko",
     native_lang: str = "en",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.3,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     lng = _lang_name(lang)
     sys = _mk_system(native_lang=native_lang, target_lang=lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Analyze the tone of this {lng} message and suggest responses.
+Role: {role}. Analyze the tone of this {lng} message and suggest responses.
 
 Message:
 {text}
@@ -318,7 +323,7 @@ def chat_reply_assistant(
     source_lang: str = "auto",
     target_lang: str = "ko",
     native_lang: str = "en",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.4,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any], str]:
@@ -326,8 +331,9 @@ def chat_reply_assistant(
     tgt = _lang_name(target_lang)
     det = _lang_name(detected)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. The user received a message in {det} and wants to reply in {tgt}.
+Role: {role}. The user received a message in {det} and wants to reply in {tgt}.
 
 Incoming message:
 {text}
@@ -350,13 +356,13 @@ Provide:
     result = "\n".join(header) + content
     return result, usage, detected
 
-# -------------- Core mode: What I Want to Say --------------
+# -------------- Optional core modes (kept for reuse/extension) --------------
 def mode_what_i_want_to_say(
     text: str,
     source_lang: str = "auto",
     target_lang: str = "ko",
     native_lang: str = "en",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.4,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any], str]:
@@ -364,8 +370,9 @@ def mode_what_i_want_to_say(
     tgt = _lang_name(target_lang)
     det = _lang_name(detected)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. The user will say something in their own words; produce versions in {tgt}.
+Role: {role}. The user will say something in their own words; produce versions in {tgt}.
 
 User intent:
 {text}
@@ -389,19 +396,19 @@ Keep each version concise (one or two short sentences).
     pre = _mk_header("Detected source language") + det + "\n"
     return pre + content, usage, detected
 
-# -------------- Core mode: What Does This Mean --------------
 def mode_what_does_this_mean(
     text: str,
     lang: str = "ko",
     native_lang: str = "en",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.3,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     lng = _lang_name(lang)
     sys = _mk_system(native_lang=native_lang, target_lang=lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Explain the meaning of this {lng} message.
+Role: {role}. Explain the meaning of this {lng} message.
 
 Message:
 {text}
@@ -421,21 +428,21 @@ Output:
     )
     return content, usage
 
-# -------------- Core mode: AI Chat Coach --------------
 def mode_ai_chat_coach(
     text: str,
     lang: str = "ko",
     native_lang: str = "en",
     target_lang: str = "ko",
-    persona: str = "Korean Friend",
+    persona: str = "korean_friend",
     temperature: float = 0.4,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     lng = _lang_name(lang)
     tgt = _lang_name(target_lang)
     sys = _mk_system(native_lang=native_lang, target_lang=target_lang)
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Analyze this chat snippet and coach the user to reply naturally in {tgt}.
+Role: {role}. Analyze this chat snippet and coach the user to reply naturally in {tgt}.
 
 Chat snippet ({lng}):
 {text}
@@ -455,18 +462,18 @@ Provide:
     )
     return content, usage
 
-# -------------- Core mode: K-pop / K-drama context --------------
 def mode_kpop_kdrama_context(
     text: str,
     native_lang: str = "en",
-    persona: str = "Korean Teacher",
+    persona: str = "korean_teacher",
     temperature: float = 0.35,
     model: Optional[str] = None,
 ) -> Tuple[str, Dict[str, Any]]:
     # Always Korean source in concept; provide both English and Chinese meaning.
     sys = _mk_system(native_lang=native_lang, target_lang="ko")
+    role = _persona_str(persona)
     usr = f"""
-Role: {persona}. Analyze a Korean lyric or drama line.
+Role: {role}. Analyze a Korean lyric or drama line.
 
 Korean line:
 {text}

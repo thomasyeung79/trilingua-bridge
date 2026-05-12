@@ -604,20 +604,26 @@ elif page == "Say":
             st.warning(t("enter_text_warn"))
         else:
             start = now_ms()
-            result, usage, detected = mode_what_i_want_to_say(
+
+            result, usage = translate_text(
                 text=text,
                 source_lang=source_choice,
                 target_lang=target_lang,
                 native_lang=native_lang,
-                persona=persona,
                 temperature=temperature,
-                model=model,
             )
+
+            detected = source_choice
             latency_ms = now_ms() - start
             usage = usage or {}
+
             st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
             st.markdown(result)
-            st.caption(f'{t("model_info_prefix")}: {usage.get("model")} • Tokens(in/out): {usage.get("prompt_tokens")}/{usage.get("completion_tokens")} • Latency: {latency_ms} ms')
+            st.caption(
+                f'{t("model_info_prefix")}: {usage.get("model")} • '
+                f'Tokens(in/out): {usage.get("prompt_tokens")}/{usage.get("completion_tokens")} • '
+                f'Latency: {latency_ms} ms'
+            )
             st.markdown('</div>', unsafe_allow_html=True)
 
             insert_history(

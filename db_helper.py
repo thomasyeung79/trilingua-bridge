@@ -4,7 +4,7 @@ import time
 from typing import Optional, List, Dict, Any
 
 
-DB_PATH = os.environ.get("DB_PATH") or "trilingua.db"
+DB_PATH = "trilingua_v2.db"
 
 
 def _db_path() -> str:

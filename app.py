@@ -616,15 +616,15 @@ elif page == "Say":
 
             st.write("DEBUG:", source_lang, target_lang, native_lang)
 
-            result, usage = translate_text(
+            result, usage, detected = translate_text(
                 text=text,
                 source_lang=source_lang,
                 target_lang=target_lang,
                 native_lang=native_lang,
                 temperature=temperature,
+                model=model,
             )
 
-            detected = source_lang
             latency_ms = now_ms() - start
             usage = usage or {}
 

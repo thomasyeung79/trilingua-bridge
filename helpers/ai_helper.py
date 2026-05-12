@@ -57,6 +57,25 @@ def _chat(
         err_msg = f"(AI error) {e}"
         return err_msg, {"model": mdl, "prompt_tokens": None, "completion_tokens": None}
 
+def mode_what_i_want_to_say(
+    text,
+    source_lang,
+    target_lang,
+    native_lang,
+    persona,
+    temperature,
+    model,
+):
+    result, usage = translate_text(
+        text=text,
+        source_lang=source_lang,
+        target_lang=target_lang,
+        native_lang=native_lang,
+        temperature=temperature,
+    )
+    detected = source_lang
+    return result, usage, detected
+
 # -------------- Language helpers --------------
 LANG_NAME = {
     "en": "English",

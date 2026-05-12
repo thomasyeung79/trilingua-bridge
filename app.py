@@ -604,7 +604,7 @@ elif page == "Say":
             st.warning(t("enter_text_warn"))
         else:
             if source_choice == t("auto_detect"):
-                source_lang = "auto"
+                source_lang = native_lang
             elif "Chinese" in source_choice or "中文" in source_choice or "중국어" in source_choice:
                 source_lang = "zh"
             elif "Korean" in source_choice or "韩语" in source_choice or "한국어" in source_choice:

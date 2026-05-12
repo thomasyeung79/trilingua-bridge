@@ -851,40 +851,42 @@ elif page == "Translate":
         run_btn = st.button(t("translate_btn"), use_container_width=True)
 
     if run_btn:
-    if not text.strip():
-        st.warning(t("enter_text_warn"))
-
-    else:
-
-        # UI语言 → 内部语言代码
-        if source_choice == "中文":
-            source_lang = "zh"
-
-        elif source_choice == "韩语":
-            source_lang = "ko"
-
-        elif source_choice == "英语":
-            source_lang = "en"
+        if not text.strip():
+            st.warning(t("enter_text_warn"))
 
         else:
-            source_lang = "auto"
 
-        start = now_ms()
+        # UI语言 → 内部语言代码
+            if source_choice == "中文":
+                source_lang = "zh"
 
-        result, usage, detected = translate_text(
-            text=text,
-            source_lang=source_lang,
-            target_lang=target_lang,
-            native_lang=native_lang,
-            temperature=temperature,
-            model=model,
-        )
+            elif source_choice == "韩语":
+                source_lang = "ko"
+
+            elif source_choice == "英语":
+                source_lang = "en"
+
+            else:
+                source_lang = "auto"
+
+            start = now_ms()
+
+            result, usage, detected = translate_text(
+                text=text,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                native_lang=native_lang,
+                temperature=temperature,
+                model=model,
+            )
+            
             latency_ms = now_ms() - start
             usage = usage or {}
             st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
             st.markdown(result)
             st.caption(f'{t("model_info_prefix")}: {usage.get("model")} • Tokens(in/out): {usage.get("prompt_tokens")}/{usage.get("completion_tokens")} • Latency: {latency_ms} ms')
             st.markdown('</div>', unsafe_allow_html=True)
+            
             insert_history(
                 username=username, mode="translate",
                 source_lang=detected or source_choice, target_lang=target_lang,

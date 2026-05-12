@@ -8,18 +8,12 @@ from dotenv import load_dotenv
 
 from helpers.db import init_db, insert_history, fetch_history
 from helpers.ai_helper import (
-    detect_lang_code,
     translate_text,
     correct_grammar,
     suggest_natural_expression,
     explain_vocabulary,
     analyze_tone,
     chat_reply_assistant,
-    mode_what_i_want_to_say,
-    mode_what_does_this_mean,
-    mode_ai_chat_coach,
-    mode_kpop_kdrama_context,
-    get_default_model,
 )
 
 # ----------------------- Boot -----------------------

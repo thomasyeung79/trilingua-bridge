@@ -334,14 +334,17 @@ st.session_state.target_lang = target_lang
 # =========================
 
 if st.sidebar.button(f"⇄ {t('swap')}", use_container_width=True):
-    st.session_state.native_lang, st.session_state.target_lang = (
-        st.session_state.target_lang,
-        st.session_state.native_lang,
-    )
+    old_native = st.session_state.native_lang
+    old_target = st.session_state.target_lang
+
+    st.session_state.native_lang = old_target
+    st.session_state.target_lang = old_native
+
+    st.session_state.native_lang_select = old_target
+    st.session_state.target_lang_select = old_native
 
     st.rerun()
-
-
+    
 # =========================
 # Persona
 # =========================

@@ -591,7 +591,7 @@ elif page == "Say":
     with cols[0]:
         source_choice = st.selectbox(
             t("source_language"),
-            options=["auto"] + STUDY_LANG_CODES,
+            source_lang = source_choice,
             index=0,
             format_func=lambda c: t("auto_detect") if c == "auto" else get_lang_display().get(c, c),
             key="say_source_lang"
@@ -603,14 +603,7 @@ elif page == "Say":
         if not text.strip():
             st.warning(t("enter_text_warn"))
         else:
-            if source_choice == t("auto_detect"):
-                source_lang = native_lang
-            elif "Chinese" in source_choice or "中文" in source_choice or "중국어" in source_choice:
-                source_lang = "zh"
-            elif "Korean" in source_choice or "韩语" in source_choice or "한국어" in source_choice:
-                source_lang = "ko"
-            else:
-                source_lang = "en"
+            source_lang = source_choice
             
             start = now_ms()
 

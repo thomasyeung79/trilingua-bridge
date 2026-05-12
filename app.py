@@ -851,18 +851,34 @@ elif page == "Translate":
         run_btn = st.button(t("translate_btn"), use_container_width=True)
 
     if run_btn:
-        if not text.strip():
-            st.warning(t("enter_text_warn"))
+    if not text.strip():
+        st.warning(t("enter_text_warn"))
+
+    else:
+
+        # UI语言 → 内部语言代码
+        if source_choice == "中文":
+            source_lang = "zh"
+
+        elif source_choice == "韩语":
+            source_lang = "ko"
+
+        elif source_choice == "英语":
+            source_lang = "en"
+
         else:
-            start = now_ms()
-            result, usage, detected = translate_text(
-                text=text,
-                source_lang=source_choice,
-                target_lang=target_lang,
-                native_lang=native_lang,
-                temperature=temperature,
-                model=model,
-            )
+            source_lang = "auto"
+
+        start = now_ms()
+
+        result, usage, detected = translate_text(
+            text=text,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            native_lang=native_lang,
+            temperature=temperature,
+            model=model,
+        )
             latency_ms = now_ms() - start
             usage = usage or {}
             st.markdown('<div class="output-wrap">', unsafe_allow_html=True)

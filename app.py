@@ -510,7 +510,7 @@ persona = st.sidebar.selectbox(t("persona"), PERSONAS, index=0, key="persona")
 temperature = st.sidebar.slider(t("creativity"), 0.0, 1.0, 0.3, 0.1, key="temperature")
 
 # Optional: model override
-default_model = get_default_model()
+default_model = "gpt-4o-mini"
 model = st.sidebar.text_input(t("model"), value=default_model, key="model_input")
 
 st.sidebar.info(t("tip"))

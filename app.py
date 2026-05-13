@@ -111,6 +111,56 @@ def get_persona_profile(source_lang: str, target_lang: str) -> Dict[str, Any]:
     )
 
 
+def make_meaning_prompt(text: str, source_lang: str, native_lang: str) -> str:
+    language_rules = (
+        "Language code rules:\n"
+        "- zh = Simplified Chinese / Mandarin Chinese\n"
+        "- yue = Traditional Chinese / Cantonese\n"
+        "- ko = Korean\n"
+        "- en = English\n\n"
+    )
+
+    output_rules = {
+        "zh": "请只用简体中文解释，不要用英文。",
+        "yue": "請只用繁體中文／粵語語氣解釋，唔好用英文。",
+        "ko": "한국어로만 설명하세요. 영어를 사용하지 마세요.",
+        "en": "Explain only in English.",
+    }
+
+    rule = output_rules.get(native_lang, "Explain in the user's native language.")
+
+    return (
+        language_rules
+        + f"Source language: {source_lang}\n"
+        + f"User native language: {native_lang}\n\n"
+        + f"{rule}\n\n"
+        + "Task: Explain what the following message really means. "
+        + "Do not only translate it. Explain tone, hidden meaning, and possible intent.\n\n"
+        + f"Message:\n{text}"
+    )
+
+
+def run_meaning_task(
+    text: str,
+    source_lang: str,
+    native_lang: str,
+    temperature: float,
+    model: str,
+    persona_profile: Dict[str, Any],
+):
+    prompt_text = make_meaning_prompt(text, source_lang, native_lang)
+
+    return translate_text(
+        text=prompt_text,
+        source_lang="en",
+        target_lang=native_lang,
+        native_lang=native_lang,
+        temperature=temperature,
+        model=model,
+        persona_profile=persona_profile,
+    )
+
+
 def run_ai_task(
     task_fn: Callable[..., Any],
     task_kwargs: Dict[str, Any],
@@ -720,15 +770,13 @@ elif page in ["Mean", "Coach", "Kpop"]:
                 )
 
             elif page == "Mean":
-                output_lang = native_lang
-                persona_profile = get_persona_profile(source_choice, output_lang)
+                persona_profile = get_persona_profile(source_choice, native_lang)
 
                 run_ai_task(
-                    task_fn=translate_text,
+                    task_fn=run_meaning_task,
                     task_kwargs=dict(
                         text=text,
                         source_lang=source_choice,
-                        target_lang=output_lang,
                         native_lang=native_lang,
                         temperature=temperature,
                         model=model,
@@ -738,13 +786,13 @@ elif page in ["Mean", "Coach", "Kpop"]:
                         username=username,
                         mode="mean",
                         source_lang=source_choice,
-                        target_lang=output_lang,
+                        target_lang=native_lang,
                         native_lang=native_lang,
                         persona_code=persona_code,
                         ui_lang=st.session_state.ui_lang,
                         user_input=text,
                     ),
-                    pron_lang=output_lang,
+                    pron_lang=native_lang,
                 )
 
             else:

@@ -23,6 +23,8 @@ from ui_helper import (
     render_result,
     show_model_caption,
     normalize_usage,
+    lang_label,
+    feature_card,
 )
 
 from db_helper import init_db, insert_history, fetch_history
@@ -34,6 +36,8 @@ from ai_helper import (
     explain_vocabulary,
     analyze_tone,
     chat_reply_assistant,
+    chat_reply_coach_advanced,
+    media_context_explain,
 )
 
 from audio_helper import (
@@ -52,6 +56,10 @@ st.set_page_config(
 
 inject_css()
 
+
+# =========================
+# Initial State
+# =========================
 
 def init_state():
     defaults = {
@@ -74,11 +82,19 @@ def init_state():
 init_state()
 
 
+# =========================
+# Database
+# =========================
+
 try:
     init_db()
 except Exception as e:
     st.warning(f"{t('db_init_failed')}: {e}")
 
+
+# =========================
+# Utilities
+# =========================
 
 def go_home_button():
     if st.button(f"🏠 {t('back_home')}", use_container_width=True):
@@ -132,7 +148,6 @@ def run_ai_task(
     latency_ms = int((time.perf_counter() - start) * 1000)
 
     st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
-
     render_result(result)
 
     if usage.get("detected_lang"):
@@ -152,21 +167,23 @@ def run_ai_task(
     if (
         st.session_state.get("show_pron")
         and isinstance(result, str)
-        and output_lang_for_pron in ("zh", "ko", "en")
+        and output_lang_for_pron in ("zh", "yue", "ko", "en")
     ):
         st.markdown(f"**{t('pronunciation_label')}**")
         st.write(to_pronunciation(result, output_lang_for_pron))
 
-        with st.spinner(t("playing_audio")):
-            audio_bytes = synthesize_tts(result, output_lang_for_pron)
+        if len(result) <= 800:
+            with st.spinner(t("playing_audio")):
+                audio_bytes = synthesize_tts(result, output_lang_for_pron)
 
-        if audio_bytes:
-            st.audio(audio_bytes, format="audio/mp3")
+            if audio_bytes:
+                st.audio(audio_bytes, format="audio/mp3")
+            else:
+                st.warning(t("tts_not_supported"))
         else:
-            st.warning(t("tts_not_supported"))
+            st.caption("Text too long for TTS. Use shorter text.")
 
     show_model_caption(usage, latency_ms)
-
     st.markdown("</div>", unsafe_allow_html=True)
 
     try:
@@ -237,6 +254,10 @@ def voice_input_ui(text_area_key: str):
                 st.warning(t("stt_unavailable"))
 
 
+# =========================
+# Sidebar
+# =========================
+
 ui_label = TEXTS[st.session_state.ui_lang]["ui_language"]
 ui_options = [UI_LANG_DISPLAY[code] for code in UI_LANGS]
 current_ui_index = UI_LANGS.index(st.session_state.ui_lang)
@@ -292,101 +313,64 @@ if st.sidebar.button(t("logout"), use_container_width=True):
     st.rerun()
 
 
-st.sidebar.markdown(
-    f'<div class="sb-title">{t("prefs_title")}</div>',
-    unsafe_allow_html=True,
-)
+with st.sidebar.expander(t("prefs_title"), expanded=True):
+    native_lang = st.selectbox(
+        t("my_native"),
+        STUDY_LANG_CODES,
+        index=STUDY_LANG_CODES.index(st.session_state.native_lang),
+        format_func=lang_label,
+        key="native_lang_select",
+    )
+    st.session_state.native_lang = native_lang
 
-lang_display = get_lang_display()
+    target_lang = st.selectbox(
+        t("i_learn"),
+        STUDY_LANG_CODES,
+        index=STUDY_LANG_CODES.index(st.session_state.target_lang),
+        format_func=lang_label,
+        key="target_lang_select",
+    )
+    st.session_state.target_lang = target_lang
 
-# =========================
-# Native Language
-# =========================
+    persona_code = st.selectbox(
+        t("persona"),
+        PERSONA_CODES,
+        index=PERSONA_CODES.index(st.session_state.persona_code),
+        format_func=persona_display,
+        key="persona_code_select",
+    )
+    st.session_state.persona_code = persona_code
 
-native_lang = st.sidebar.selectbox(
-    t("my_native"),
-    STUDY_LANG_CODES,
-    index=STUDY_LANG_CODES.index(st.session_state.native_lang),
-    format_func=lambda code: lang_display.get(code, code),
-    key="native_lang_select",
-)
+    temperature = st.slider(
+        t("creativity"),
+        0.0,
+        1.0,
+        st.session_state.temperature,
+        0.1,
+        key="temperature_slider",
+    )
+    st.session_state.temperature = temperature
 
-st.session_state.native_lang = native_lang
+    model = st.text_input(
+        t("model"),
+        value=st.session_state.model_input,
+        key="model_input_text",
+    )
+    st.session_state.model_input = model
 
-
-# =========================
-# Target Language
-# =========================
-
-target_lang = st.sidebar.selectbox(
-    t("i_learn"),
-    STUDY_LANG_CODES,
-    index=STUDY_LANG_CODES.index(st.session_state.target_lang),
-    format_func=lambda code: lang_display.get(code, code),
-    key="target_lang_select",
-)
-
-st.session_state.target_lang = target_lang
-
-    
-# =========================
-# Persona
-# =========================
-
-persona_code = st.sidebar.selectbox(
-    t("persona"),
-    PERSONA_CODES,
-    index=PERSONA_CODES.index(st.session_state.persona_code),
-    format_func=persona_display,
-    key="persona_code_select",
-)
-
-st.session_state.persona_code = persona_code
-
-
-# =========================
-# Temperature
-# =========================
-
-temperature = st.sidebar.slider(
-    t("creativity"),
-    0.0,
-    1.0,
-    st.session_state.temperature,
-    0.1,
-    key="temperature_slider",
-)
-
-st.session_state.temperature = temperature
-
-
-# =========================
-# Model
-# =========================
-
-model = st.sidebar.text_input(
-    t("model"),
-    value=st.session_state.model_input,
-    key="model_input_text",
-)
-
-st.session_state.model_input = model
-
-
-# =========================
-# Pronunciation Toggle
-# =========================
-
-show_pron = st.sidebar.checkbox(
-    t("show_pron"),
-    value=st.session_state.show_pron,
-    key="show_pron_checkbox",
-)
-
-st.session_state.show_pron = show_pron
-
+    show_pron = st.checkbox(
+        t("show_pron"),
+        value=st.session_state.show_pron,
+        key="show_pron_checkbox",
+    )
+    st.session_state.show_pron = show_pron
 
 st.sidebar.info(t("tip"))
+
+
+# =========================
+# Navigation
+# =========================
 
 NAV_ITEMS = [
     ("Home", f"🏠 {t('nav_home')}"),
@@ -424,78 +408,91 @@ if selected_page != st.session_state.page:
 
 page = st.session_state.page
 username = st.session_state.username
+native_lang = st.session_state.native_lang
+target_lang = st.session_state.target_lang
+persona_code = st.session_state.persona_code
+temperature = st.session_state.temperature
+model = st.session_state.model_input
 
+
+# =========================
+# Pages
+# =========================
 
 if page == "Home":
     hero(t("app_title"), t("subtitle"), t("not_social"))
-
     section_header(t("what_can"), t("what_can_sub"))
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button(
-            f"🗣️ {t('mode_say')}\n\n{t('mode_say_sub')}",
-            use_container_width=True,
-        ):
-            st.session_state.page = "Say"
-            st.rerun()
-
-    with col2:
-        if st.button(
-            f"❓ {t('mode_mean')}\n\n{t('mode_mean_sub')}",
-            use_container_width=True,
-        ):
-            st.session_state.page = "Mean"
-            st.rerun()
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        if st.button(
-            f"🎯 {t('mode_coach')}\n\n{t('mode_coach_sub')}",
-            use_container_width=True,
-        ):
+        if feature_card(t("mode_coach"), t("mode_coach_sub"), "🎯", key="card_coach"):
             st.session_state.page = "Coach"
             st.rerun()
 
+    with col2:
+        if feature_card(t("mode_say"), t("mode_say_sub"), "🗣️", key="card_say"):
+            st.session_state.page = "Say"
+            st.rerun()
+
+    with col3:
+        if feature_card(t("mode_mean"), t("mode_mean_sub"), "❓", key="card_mean"):
+            st.session_state.page = "Mean"
+            st.rerun()
+
+    col4, col5, col6 = st.columns(3)
+
     with col4:
-        if st.button(
-            f"🎵 {t('mode_kpop')}\n\n{t('mode_kpop_sub')}",
-            use_container_width=True,
-        ):
+        if feature_card(t("mode_kpop"), t("mode_kpop_sub"), "🎵", key="card_media"):
             st.session_state.page = "Kpop"
             st.rerun()
 
-    section_header(t("more_tools"), t("more_tools_sub"), accent="green")
-
-    col5, col6 = st.columns(2)
-
     with col5:
-        if st.button(f"🌐 {t('feature_translate')}", use_container_width=True):
+        if feature_card(t("feature_translate"), t("tip"), "🌐", key="card_translate"):
             st.session_state.page = "Translate"
             st.rerun()
 
     with col6:
-        if st.button(f"✍️ {t('feature_grammar')}", use_container_width=True):
+        if feature_card(
+            t("feature_grammar"),
+            t("feature_grammar_sub"),
+            "✍️",
+            key="card_grammar",
+        ):
             st.session_state.page = "Grammar"
             st.rerun()
 
-    col7, col8 = st.columns(2)
+    col7, col8, col9 = st.columns(3)
 
     with col7:
-        if st.button(f"🎯 {t('feature_natural')}", use_container_width=True):
+        if feature_card(
+            t("feature_natural"),
+            t("feature_natural_sub"),
+            "🎯",
+            key="card_natural",
+        ):
             st.session_state.page = "Natural"
             st.rerun()
 
     with col8:
-        if st.button(f"📚 {t('feature_vocab')}", use_container_width=True):
+        if feature_card(
+            t("feature_vocab"),
+            t("feature_vocab_sub"),
+            "📚",
+            key="card_vocab",
+        ):
             st.session_state.page = "Vocabulary"
             st.rerun()
 
-    if st.button(f"🗣️ {t('feature_tone')}", use_container_width=True):
-        st.session_state.page = "Tone"
-        st.rerun()
+    with col9:
+        if feature_card(
+            t("feature_tone"),
+            t("feature_tone_sub"),
+            "🗣️",
+            key="card_tone",
+        ):
+            st.session_state.page = "Tone"
+            st.rerun()
 
 
 elif page in ["Say", "Translate"]:
@@ -601,8 +598,76 @@ elif page in ["Mean", "Coach", "Kpop"]:
     voice_input_ui(text_key)
 
     if page == "Kpop":
-        source_choice = "ko"
+        col1, col2 = st.columns(2)
+
+        with col1:
+            source_choice = st.selectbox(
+                t("language_of_text"),
+                ["auto"] + STUDY_LANG_CODES,
+                index=0,
+                format_func=lambda code: (
+                    t("auto_detect")
+                    if code == "auto"
+                    else get_lang_display().get(code, code)
+                ),
+                key="media_source_lang",
+            )
+
+        with col2:
+            ctx_type = st.selectbox(
+                t("context_type"),
+                [
+                    t("ctx_kpop"),
+                    t("ctx_kdrama"),
+                    t("ctx_cantodrama"),
+                    t("ctx_cdrama"),
+                    t("ctx_eng_tv"),
+                    t("ctx_inet"),
+                    t("ctx_pop"),
+                ],
+                index=0,
+                key="media_ctx_type",
+            )
+
         run_button = st.button(t("run"), use_container_width=True)
+
+    elif page == "Coach":
+        col1, col2 = st.columns(2)
+
+        with col1:
+            source_choice = st.selectbox(
+                t("language_of_text"),
+                ["auto"] + STUDY_LANG_CODES,
+                index=0,
+                format_func=lambda code: (
+                    t("auto_detect")
+                    if code == "auto"
+                    else get_lang_display().get(code, code)
+                ),
+                key="coach_source_lang",
+            )
+
+        with col2:
+            styles = [
+                t("style_friend"),
+                t("style_crush"),
+                t("style_work"),
+                t("style_formal"),
+                t("style_cute"),
+                t("style_cold"),
+                t("style_kpop"),
+                t("style_hk"),
+            ]
+
+            reply_style = st.selectbox(
+                t("relation_mode"),
+                styles,
+                index=0,
+                key="coach_style_select",
+            )
+
+        run_button = st.button(t("run"), use_container_width=True)
+
     else:
         col1, col2 = st.columns(2)
 
@@ -630,12 +695,13 @@ elif page in ["Mean", "Coach", "Kpop"]:
                 persona_profile = get_persona_profile(source_choice, target_lang)
 
                 run_ai_task(
-                    task_fn=chat_reply_assistant,
+                    task_fn=chat_reply_coach_advanced,
                     task_kwargs=dict(
                         text=text,
                         source_lang=source_choice,
                         target_lang=target_lang,
                         native_lang=native_lang,
+                        reply_style=reply_style,
                         temperature=temperature,
                         model=model,
                         persona_profile=persona_profile,
@@ -653,8 +719,8 @@ elif page in ["Mean", "Coach", "Kpop"]:
                     pron_lang=target_lang,
                 )
 
-            else:
-                output_lang = native_lang if page == "Mean" else target_lang
+            elif page == "Mean":
+                output_lang = native_lang
                 persona_profile = get_persona_profile(source_choice, output_lang)
 
                 run_ai_task(
@@ -670,7 +736,7 @@ elif page in ["Mean", "Coach", "Kpop"]:
                     ),
                     history_kwargs=dict(
                         username=username,
-                        mode=mode_map[page],
+                        mode="mean",
                         source_lang=source_choice,
                         target_lang=output_lang,
                         native_lang=native_lang,
@@ -681,71 +747,37 @@ elif page in ["Mean", "Coach", "Kpop"]:
                     pron_lang=output_lang,
                 )
 
+            else:
+                persona_profile = get_persona_profile(source_choice, native_lang)
 
-elif page == "Chat":
-    go_home_button()
-
-    section_header(t("feature_chat"), t("tip"))
-
-    st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
-    text = st.text_area(t("your_message"), height=160, key="chat_message")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    voice_input_ui("chat_message")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        source_choice = st.selectbox(
-            t("msg_language"),
-            ["auto"] + STUDY_LANG_CODES,
-            index=0,
-            format_func=lambda code: (
-                t("auto_detect")
-                if code == "auto"
-                else get_lang_display().get(code, code)
-            ),
-            key="chat_source_lang",
-        )
-
-    with col2:
-        run_button = st.button(t("generate_reply"), use_container_width=True)
-
-    if run_button:
-        if not text.strip():
-            st.warning(t("enter_text_warn"))
-        else:
-            persona_profile = get_persona_profile(source_choice, target_lang)
-
-            run_ai_task(
-                task_fn=chat_reply_assistant,
-                task_kwargs=dict(
-                    text=text,
-                    source_lang=source_choice,
-                    target_lang=target_lang,
-                    native_lang=native_lang,
-                    temperature=temperature,
-                    model=model,
-                    persona_profile=persona_profile,
-                ),
-                history_kwargs=dict(
-                    username=username,
-                    mode="chat",
-                    source_lang=source_choice,
-                    target_lang=target_lang,
-                    native_lang=native_lang,
-                    persona_code=persona_code,
-                    ui_lang=st.session_state.ui_lang,
-                    user_input=text,
-                ),
-                pron_lang=target_lang,
-            )
+                run_ai_task(
+                    task_fn=media_context_explain,
+                    task_kwargs=dict(
+                        text=text,
+                        source_lang=source_choice,
+                        native_lang=native_lang,
+                        context_type=ctx_type,
+                        temperature=temperature,
+                        model=model,
+                        persona_profile=persona_profile,
+                    ),
+                    history_kwargs=dict(
+                        username=username,
+                        mode="kpop",
+                        source_lang=source_choice,
+                        target_lang=native_lang,
+                        native_lang=native_lang,
+                        persona_code=persona_code,
+                        ui_lang=st.session_state.ui_lang,
+                        user_input=text,
+                    ),
+                    pron_lang=native_lang,
+                )
 
 
 elif page == "Grammar":
     go_home_button()
-
-    section_header(t("feature_grammar"), t("tip"))
+    section_header(t("feature_grammar"), t("feature_grammar_sub"))
 
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("enter_text_correct"), height=150, key="grammar_text")
@@ -796,15 +828,10 @@ elif page == "Grammar":
 
 elif page == "Natural":
     go_home_button()
-
-    section_header(t("feature_natural"), t("tip"))
+    section_header(t("feature_natural"), t("feature_natural_sub"))
 
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
-    text = st.text_area(
-        t("enter_text_natural"),
-        height=150,
-        key="natural_text",
-    )
+    text = st.text_area(t("enter_text_natural"), height=150, key="natural_text")
     st.markdown("</div>", unsafe_allow_html=True)
 
     voice_input_ui("natural_text")
@@ -852,15 +879,10 @@ elif page == "Natural":
 
 elif page == "Vocabulary":
     go_home_button()
-
-    section_header(t("feature_vocab"), t("tip"))
+    section_header(t("feature_vocab"), t("feature_vocab_sub"))
 
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
-    text = st.text_area(
-        t("enter_text_vocab"),
-        height=150,
-        key="vocab_text",
-    )
+    text = st.text_area(t("enter_text_vocab"), height=150, key="vocab_text")
     st.markdown("</div>", unsafe_allow_html=True)
 
     voice_input_ui("vocab_text")
@@ -906,8 +928,7 @@ elif page == "Vocabulary":
 
 elif page == "Tone":
     go_home_button()
-
-    section_header(t("feature_tone"), t("tip"))
+    section_header(t("feature_tone"), t("feature_tone_sub"))
 
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("enter_text_tone"), height=150, key="tone_text")
@@ -960,7 +981,6 @@ elif page == "Tone":
 
 elif page == "History":
     go_home_button()
-
     section_header(t("history_title"), t("history_sub"))
 
     col1, col2, col3, col4 = st.columns(4)
@@ -974,7 +994,6 @@ elif page == "History":
                 "mean",
                 "coach",
                 "kpop",
-                "chat",
                 "translate",
                 "grammar",
                 "natural",
@@ -987,14 +1006,14 @@ elif page == "History":
     with col2:
         filter_source = st.selectbox(
             t("filter_source"),
-            ["All", "auto", "zh", "ko", "en"],
+            ["All", "auto"] + STUDY_LANG_CODES,
             index=0,
         )
 
     with col3:
         filter_target = st.selectbox(
             t("filter_target"),
-            ["All", "zh", "ko", "en"],
+            ["All"] + STUDY_LANG_CODES,
             index=0,
         )
 
@@ -1092,7 +1111,6 @@ elif page == "History":
 
 elif page == "About":
     go_home_button()
-
     section_header(t("about_title"))
     st.write(t("about_desc"))
 

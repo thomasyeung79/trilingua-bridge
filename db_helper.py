@@ -4,32 +4,24 @@ import time
 from typing import Optional, List, Dict, Any
 
 
-DB_PATH = "trilingua_v2.db"
+DB_PATH = os.environ.get("DB_PATH") or "trilingua_bridge.db"
 
 
-def _db_path() -> str:
-    """
-    Get database path.
-    Priority:
-    1. Streamlit secrets
-    2. Environment variable
-    3. Default local database
-    """
+def get_db_path() -> str:
     try:
         import streamlit as st
 
         db_path = st.secrets.get("DB_PATH")
         if db_path:
             return db_path
-
     except Exception:
         pass
 
     return DB_PATH
 
 
-def _get_conn() -> sqlite3.Connection:
-    db_path = _db_path()
+def get_connection() -> sqlite3.Connection:
+    db_path = get_db_path()
     folder = os.path.dirname(db_path)
 
     if folder and not os.path.exists(folder):
@@ -39,15 +31,15 @@ def _get_conn() -> sqlite3.Connection:
 
 
 def init_db():
-    conn = _get_conn()
-    cur = conn.cursor()
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    cur.execute(
+    cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
-            mode TEXT NOT NULL,
+            mode TEXT,
             source_lang TEXT,
             target_lang TEXT,
             native_lang TEXT,
@@ -55,26 +47,33 @@ def init_db():
             ui_lang TEXT,
             user_input TEXT,
             ai_output TEXT,
-            model TEXT,
             tokens_input INTEGER,
             tokens_output INTEGER,
+            model TEXT,
             latency_ms INTEGER,
             timestamp INTEGER NOT NULL
         );
         """
     )
 
-    cur.execute(
+    cursor.execute(
         """
-        CREATE INDEX IF NOT EXISTS idx_history_username_timestamp
-        ON history (username, timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_history_user_time
+        ON history(username, timestamp DESC);
         """
     )
 
-    cur.execute(
+    cursor.execute(
         """
         CREATE INDEX IF NOT EXISTS idx_history_mode
-        ON history (mode);
+        ON history(mode);
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_history_langs
+        ON history(source_lang, target_lang);
         """
     )
 
@@ -95,14 +94,14 @@ def insert_history(
     tokens_input: Optional[int],
     tokens_output: Optional[int],
     model: Optional[str],
-    latency_ms: int,
+    latency_ms: Optional[int],
 ):
     timestamp = int(time.time() * 1000)
 
-    conn = _get_conn()
-    cur = conn.cursor()
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    cur.execute(
+    cursor.execute(
         """
         INSERT INTO history (
             username,
@@ -114,27 +113,27 @@ def insert_history(
             ui_lang,
             user_input,
             ai_output,
-            model,
             tokens_input,
             tokens_output,
+            model,
             latency_ms,
             timestamp
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            username,
-            mode,
-            source_lang,
-            target_lang,
-            native_lang,
-            persona,
-            ui_lang,
-            user_input,
-            ai_output,
-            model,
+            username or "guest",
+            mode or "",
+            source_lang or "",
+            target_lang or "",
+            native_lang or "",
+            persona or "",
+            ui_lang or "",
+            user_input or "",
+            ai_output or "",
             tokens_input,
             tokens_output,
+            model or "",
             latency_ms,
             timestamp,
         ),
@@ -153,9 +152,6 @@ def fetch_history(
     persona: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    conn = _get_conn()
-    cur = conn.cursor()
-
     query = """
         SELECT
             id,
@@ -168,66 +164,67 @@ def fetch_history(
             ui_lang,
             user_input,
             ai_output,
-            model,
             tokens_input,
             tokens_output,
+            model,
             latency_ms,
             timestamp
         FROM history
         WHERE username = ?
     """
 
-    args: List[Any] = [username]
+    params: List[Any] = [username]
 
     if mode:
         query += " AND mode = ?"
-        args.append(mode)
+        params.append(mode)
 
     if source_lang:
         query += " AND source_lang = ?"
-        args.append(source_lang)
+        params.append(source_lang)
 
     if target_lang:
         query += " AND target_lang = ?"
-        args.append(target_lang)
+        params.append(target_lang)
 
     if persona:
         query += " AND persona = ?"
-        args.append(persona)
+        params.append(persona)
 
     if search:
         query += " AND (user_input LIKE ? OR ai_output LIKE ?)"
         like_value = f"%{search}%"
-        args.extend([like_value, like_value])
+        params.extend([like_value, like_value])
 
     query += " ORDER BY timestamp DESC LIMIT ?"
-    args.append(limit)
+    params.append(limit)
 
-    cur.execute(query, args)
-    rows = cur.fetchall()
+    conn = get_connection()
+    cursor = conn.cursor()
+    rows = cursor.execute(query, params).fetchall()
     conn.close()
 
-    history = []
+    columns = [
+        "id",
+        "username",
+        "mode",
+        "source_lang",
+        "target_lang",
+        "native_lang",
+        "persona",
+        "ui_lang",
+        "user_input",
+        "ai_output",
+        "tokens_input",
+        "tokens_output",
+        "model",
+        "latency_ms",
+        "timestamp",
+    ]
+
+    history: List[Dict[str, Any]] = []
 
     for row in rows:
-        history.append(
-            {
-                "id": row[0],
-                "username": row[1],
-                "mode": row[2],
-                "source_lang": row[3],
-                "target_lang": row[4],
-                "native_lang": row[5],
-                "persona": row[6],
-                "ui_lang": row[7],
-                "user_input": row[8],
-                "ai_output": row[9],
-                "model": row[10],
-                "tokens_input": row[11],
-                "tokens_output": row[12],
-                "latency_ms": row[13],
-                "timestamp": row[14],
-            }
-        )
+        history.append(dict(zip(columns, row)))
 
     return history

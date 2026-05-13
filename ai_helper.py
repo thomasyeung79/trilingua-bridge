@@ -156,6 +156,12 @@ def call_json_chat(
     user_prompt: str,
     temperature: float = 0.4,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+
+    system_prompt = (
+        system_prompt
+        + "\nReturn valid JSON only. Do not include markdown."
+    )
+
     openai_model = model or get_default_model()
 
     openai_client = get_openai_client()
@@ -177,8 +183,11 @@ def call_json_chat(
 
             return data, usage_from_response(response, "openai"), content
 
-        except Exception:
-            pass
+        except Exception as e:
+            openai_error = str(e)
+
+    else:
+        openai_error = "No OpenAI client"
 
     deepseek_client = get_deepseek_client()
 
@@ -202,10 +211,16 @@ def call_json_chat(
             return data, usage_from_response(response, "deepseek"), content
 
         except Exception as e:
+            deepseek_error = str(e)
+
             return (
                 {
                     "mock": True,
-                    "message": f"Both OpenAI and DeepSeek failed. Last error: {e}",
+                    "message": (
+                        "Both OpenAI and DeepSeek failed.\n\n"
+                        f"OpenAI Error: {openai_error}\n"
+                        f"DeepSeek Error: {deepseek_error}"
+                    ),
                 },
                 mock_usage(model),
                 "",
@@ -214,7 +229,10 @@ def call_json_chat(
     return (
         {
             "mock": True,
-            "message": "No available AI provider. Please set OPENAI_API_KEY or DEEPSEEK_API_KEY.",
+            "message": (
+                "No available AI provider.\n"
+                "Please set OPENAI_API_KEY or DEEPSEEK_API_KEY."
+            ),
         },
         mock_usage(model),
         "",

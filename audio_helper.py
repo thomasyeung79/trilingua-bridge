@@ -12,6 +12,11 @@ import eng_to_ipa as ipa
 
 from openai import OpenAI
 
+try:
+    import pycantonese
+except Exception:
+    pycantonese = None
+
 
 DetectorFactory.seed = 0
 
@@ -20,9 +25,10 @@ def to_pronunciation(text: str, lang: str) -> str:
     """
     Convert text into pronunciation guide.
 
-    zh -> Pinyin
-    ko -> Korean romanization
-    en -> IPA
+    zh  -> Mandarin Pinyin
+    yue -> Cantonese Jyutping
+    ko  -> Korean Romanization
+    en  -> English IPA
     """
 
     text = text or ""
@@ -41,6 +47,21 @@ def to_pronunciation(text: str, lang: str) -> str:
                 for item in pinyin_result
                 if item and item[0].strip()
             )
+
+        if lang == "yue":
+            if pycantonese:
+                try:
+                    jyutping_result = pycantonese.characters_to_jyutping(text)
+
+                    return " ".join(
+                        item[1]
+                        for item in jyutping_result
+                        if item and len(item) > 1 and item[1]
+                    )
+                except Exception:
+                    pass
+
+            return text
 
         if lang == "ko":
             transliter = Transliter(academic)
@@ -77,6 +98,10 @@ def to_pronunciation(text: str, lang: str) -> str:
 def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
     """
     Generate MP3 audio bytes using gTTS.
+
+    Note:
+    gTTS does not have strong Cantonese support.
+    For yue, this version falls back to zh-CN.
     """
 
     text = text or ""
@@ -86,6 +111,7 @@ def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
 
     lang_map = {
         "zh": "zh-CN",
+        "yue": "zh-CN",
         "en": "en",
         "ko": "ko",
     }
@@ -133,6 +159,9 @@ def transcribe_audio(
 ) -> Optional[str]:
     """
     Transcribe audio using OpenAI Whisper API.
+
+    yue is passed as zh because Whisper language parameter
+    does not always support Cantonese as a separate code.
     """
 
     api_key = get_openai_api_key()
@@ -144,6 +173,7 @@ def transcribe_audio(
 
     whisper_lang_map = {
         "zh": "zh",
+        "yue": "zh",
         "en": "en",
         "ko": "ko",
     }
@@ -168,7 +198,5 @@ def transcribe_audio(
 
         return None
 
-
     except Exception:
-
         return None

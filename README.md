@@ -1,49 +1,207 @@
-# TriLingua Bridge AI
-## 语言与跨文化沟通助手（中 / 韩 / 英）
+# 🌏 TriLingua Bridge v2
 
-一个基于 Python + Streamlit + OpenAI 的多语言 AI 沟通平台，支持中文、韩语、英语之间的翻译、学习与跨文化交流。
+AI Cross-cultural Communication Assistant  
+AI 多语言与跨文化沟通助手
 
----
+Supports:
 
-# 功能 Features
+- 🇨🇳 Mandarin Chinese
+- 🇭🇰 Cantonese
+- 🇰🇷 Korean
+- 🇺🇸 English
 
-- 全面多语言 UI（English / 简体中文 / 한국어）
-- 语言中立人格系统
-  - 友好聊天
-  - 语言老师
-  - 职场助手
-  - 旅行模式
-  - 流行文化模式
-- 发音显示
-  - 中文拼音（Pinyin）
-  - 韩语罗马音（Romanization）
-  - 英语 IPA
-- 一键播放发音（gTTS）
-- 语音输入与转写（OpenAI Whisper）
-- AI 翻译
-- 语法纠正
-- 地道表达优化
-- 词汇讲解
-- 语气分析
-- 聊天回复助手
-- SQLite 用户数据隔离
-
----
-
-# 技术栈 Tech Stack
+Built with:
 
 - Python
 - Streamlit
 - OpenAI API
-- SQLite
-- gTTS
-- Whisper API
+- Claude Code
 
 ---
 
-# 快速开始 Quick Start
+# ✨ Features
 
-## 1. 安装依赖
+## 🎯 AI Chat Coach
+
+Generate natural replies for:
+
+- daily chat
+- dating / crush conversations
+- workplace communication
+- formal situations
+- K-pop fandom style
+- Hong Kong / Cantonese style
+
+Includes:
+
+- 3 natural reply suggestions
+- tone analysis
+- cultural notes
+- recommended best reply
+
+---
+
+## 🌐 Translation
+
+Natural multilingual translation between:
+
+- Chinese
+- Cantonese
+- Korean
+- English
+
+Supports:
+
+- auto language detection
+- natural tone preservation
+- cross-cultural wording adjustment
+
+---
+
+## ✍️ Grammar Correction
+
+- fix grammar mistakes
+- explain corrections
+- learner-friendly feedback
+- beginner / intermediate / advanced support
+
+---
+
+## 🎯 Natural Expression
+
+Improve unnatural sentences into:
+
+- native-like expressions
+- softer tone
+- more polite tone
+- more casual tone
+- more natural conversation style
+
+---
+
+## 📚 Vocabulary Explanation
+
+Explain:
+
+- slang
+- difficult words
+- internet expressions
+- cultural vocabulary
+- K-pop fandom language
+
+---
+
+## 🗣️ Tone Analysis
+
+Analyze:
+
+- emotion
+- politeness
+- hidden meaning
+- social tone
+- passive-aggressive expressions
+- relationship vibe
+
+---
+
+## 🎵 Lyrics & Drama Context
+
+Understand:
+
+- K-pop lyrics
+- Korean drama dialogue
+- Chinese drama dialogue
+- Cantonese drama dialogue
+- English TV/movie dialogue
+- internet slang
+- pop culture references
+
+Includes:
+
+- translation
+- key phrase explanation
+- cultural background
+- slang explanation
+- recommended understanding
+
+---
+
+## 🔊 Pronunciation Support
+
+Supports:
+
+- Mandarin Pinyin
+- Cantonese Jyutping
+- Korean Romanization
+- English IPA
+
+---
+
+## 🎤 Voice Input (STT)
+
+Upload audio files:
+
+- wav
+- mp3
+- m4a
+- webm
+
+Powered by OpenAI Whisper.
+
+---
+
+## 🔈 Text-to-Speech (TTS)
+
+Generate pronunciation audio using:
+
+- OpenAI TTS
+- gTTS fallback
+
+---
+
+## 🗂️ User-isolated History
+
+SQLite-based history system.
+
+Each username has isolated:
+
+- conversations
+- translations
+- AI outputs
+- learning history
+
+---
+
+# 🖥️ UI Preview
+
+Main modules:
+
+- Home
+- Say
+- Mean
+- AI Chat Coach
+- Lyrics & Drama Context
+- Translation
+- Grammar
+- Natural Expression
+- Vocabulary
+- Tone Analysis
+- History
+
+---
+
+# 🚀 Installation
+
+## 1. Clone Project
+
+```bash
+git clone https://github.com/yourname/trilingua-bridge.git
+cd trilingua-bridge
+```
+
+---
+
+## 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -51,29 +209,36 @@ pip install -r requirements.txt
 
 ---
 
-## 2. 配置 API Key 与数据库
+## 3. Configure Environment Variables
 
-### 方式 A：使用 `.env`
+Copy:
 
-项目根目录创建：
+```text
+.env.example
+```
+
+to:
+
+```text
+.env
+```
+
+Then add your OpenAI API key:
 
 ```env
-OPENAI_API_KEY=sk-...
-DB_PATH=trilingua.db
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Optional proxy settings:
+
+```env
+HTTP_PROXY=http://127.0.0.1:7890
+HTTPS_PROXY=http://127.0.0.1:7890
 ```
 
 ---
 
-### 方式 B：使用 `.streamlit/secrets.toml`
-
-```toml
-OPENAI_API_KEY = "sk-..."
-DB_PATH = "trilingua.db"
-```
-
----
-
-## 3. 运行项目
+## 4. Run the App
 
 ```bash
 streamlit run app.py
@@ -81,55 +246,140 @@ streamlit run app.py
 
 ---
 
-# 使用说明 Notes
+# 📦 Requirements
 
-- 没有 `OPENAI_API_KEY` 时：
-  - AI 输出为本地模拟
-  - Whisper 语音转写不可用
-  - 应用仍可正常运行
-
-- TTS 使用 gTTS
-  - 浏览器内直接播放 MP3
-
-- 语音输入支持：
-  - wav
-  - mp3
-  - m4a
-  - webm
-
-- 历史记录按用户名隔离存储
-
----
-
-# 项目结构 Project Structure
+Main dependencies:
 
 ```text
-project/
-│
-├── app.py               # 主应用入口
-├── ui_helper.py         # UI 与多语言文本
-├── ai_helper.py         # OpenAI 与人格系统
-├── db_helper.py         # SQLite 数据库
-├── audio_helper.py      # TTS / STT / 发音处理
-├── requirements.txt
-└── README.md
+streamlit>=1.33.0
+python-dotenv>=1.0.1
+openai>=1.13.3
+pycantonese>=4.0.0
+tiktoken>=0.6.0
+```
+
+Optional pronunciation libraries:
+
+```text
+pypinyin
+hangul-romanize
+eng-to-ipa
 ```
 
 ---
 
-# 未来计划 Roadmap
+# 📁 Recommended Project Structure
 
-- Apple Health 风格 UI
-- 韩语学习模式增强
-- 多用户云端数据库
-- AI 对话记忆
-- 实时语音聊天
-- 移动端适配
+```text
+TriLingua-Bridge/
+│
+├── app.py
+├── ai_helper.py
+├── audio_helper.py
+├── db_helper.py
+├── ui_helper.py
+│
+├── requirements.txt
+├── README.md
+├── .env.example
+│
+├── trilingua_bridge.db
+│
+└── .streamlit/
+    └── secrets.toml
+```
 
 ---
 
-# 作者 Author
+# 🧠 Tech Stack
 
-Thomas Yeung  
-Master of IT (Applied AI)  
-Sydney, Australia
+Frontend:
+
+- Streamlit
+
+Backend:
+
+- Python
+
+AI:
+
+- OpenAI GPT
+- Whisper
+- TTS
+
+Database:
+
+- SQLite
+
+Deployment:
+
+- Streamlit Cloud
+
+---
+
+# 🌍 Current Supported Languages
+
+| Language | Status |
+|---|---|
+| English | ✅ |
+| Mandarin Chinese | ✅ |
+| Cantonese | ✅ |
+| Korean | ✅ |
+
+---
+
+# 🔮 Planned Features
+
+## v2.x
+
+- better Cantonese support
+- advanced pronunciation UI
+- conversation memory
+- AI relationship analysis
+- multilingual speech mode
+- streaming response
+- export chat history
+
+## v3
+
+- mobile-first UI
+- AI language partner mode
+- Apple-style UX redesign
+- real-time voice conversation
+- personalized learning system
+
+---
+
+# ⚠️ Notes
+
+- OpenAI API is required for full AI functionality.
+- Without API keys, the app can still run in mock/fallback mode.
+- OpenAI TTS/STT API response structures may change over time.
+- If compatibility issues occur, please check the latest OpenAI SDK documentation.
+
+---
+
+# 👨‍💻 Development Notes
+
+This project originally started as a small personal language-learning helper:
+
+- replying to Korean messages
+- understanding lyrics
+- improving natural expressions
+
+It gradually evolved into a full multilingual AI communication platform.
+
+This version was also one of the first large-scale experiments using Claude Code for AI-assisted software development.
+
+---
+
+# 📜 License
+
+MIT License
+
+---
+
+# ❤️ TriLingua Bridge
+
+Language is not only translation.  
+It is culture, tone, emotion, and human connection.

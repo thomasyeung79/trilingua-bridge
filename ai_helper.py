@@ -1,145 +1,140 @@
+import json
 import os
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Optional, Tuple
 
-from langdetect import detect, DetectorFactory
-from openai import OpenAI
+from dotenv import load_dotenv
 
 
-DetectorFactory.seed = 0
+load_dotenv()
+
+Lang = str
 
 
 # =========================
 # OpenAI Client
 # =========================
 
-def get_openai_client() -> Optional[OpenAI]:
-    """
-    Get OpenAI client from environment or Streamlit secrets.
-    """
-
+def get_openai_client():
     api_key = os.environ.get("OPENAI_API_KEY")
 
     try:
         import streamlit as st
 
         api_key = st.secrets.get("OPENAI_API_KEY") or api_key
-
     except Exception:
         pass
 
     if not api_key:
         return None
 
-    return OpenAI(api_key=api_key)
-
-
-# =========================
-# OpenAI Wrapper
-# =========================
-
-def call_openai(
-    messages,
-    model: str = "gpt-4o-mini",
-    temperature: float = 0.3,
-) -> Tuple[str, Dict[str, Any]]:
-
-    client = get_openai_client()
-
-    if not client:
-        mock_response = (
-            "AI response (mock): "
-            + (
-                messages[-1].get("content", "")[:200]
-                if messages
-                else ""
-            )
-        )
-
-        return mock_response, {
-            "model": model,
-            "prompt_tokens": None,
-            "completion_tokens": None,
-        }
-
     try:
-        response = client.chat.completions.create(
-            model=model or "gpt-4o-mini",
-            temperature=temperature,
-            messages=messages,
-        )
+        from openai import OpenAI
 
-        text = response.choices[0].message.content
-
-        usage = {
-            "model": getattr(response, "model", model),
-            "prompt_tokens": (
-                getattr(response.usage, "prompt_tokens", None)
-                if hasattr(response, "usage")
-                else None
-            ),
-            "completion_tokens": (
-                getattr(response.usage, "completion_tokens", None)
-                if hasattr(response, "usage")
-                else None
-            ),
-        }
-
-        return text, usage
-
-    except Exception as e:
-        return (
-            f"AI error or network issue: {e}",
-            {
-                "model": model,
-                "prompt_tokens": None,
-                "completion_tokens": None,
-            },
-        )
-
-
-# =========================
-# Language Detection
-# =========================
-
-def detect_language(text: str) -> Optional[str]:
-
-    try:
-        code = detect(text)
-
-        if code.startswith("zh"):
-            return "zh"
-
-        if code.startswith("ko"):
-            return "ko"
-
-        if code.startswith("en"):
-            return "en"
-
-        return None
-
+        return OpenAI(api_key=api_key)
     except Exception:
         return None
 
 
 # =========================
-# Persona Prompt
+# Helpers
 # =========================
 
-def build_system_prompt(
-    persona_profile: Dict[str, Any],
-    native_lang: str,
-    target_lang: str,
-) -> str:
+def usage_from_response(response) -> Dict[str, Any]:
+    usage = getattr(response, "usage", None)
 
-    style = persona_profile.get("style_hint", "")
+    return {
+        "model": getattr(response, "model", None),
+        "prompt_tokens": getattr(usage, "prompt_tokens", None) if usage else None,
+        "completion_tokens": getattr(usage, "completion_tokens", None) if usage else None,
+        "total_tokens": getattr(usage, "total_tokens", None) if usage else None,
+    }
+
+
+def mock_usage(model: str) -> Dict[str, Any]:
+    return {
+        "model": model,
+        "prompt_tokens": None,
+        "completion_tokens": None,
+        "total_tokens": None,
+    }
+
+
+def safe_json_loads(text: str) -> Dict[str, Any]:
+    try:
+        return json.loads(text)
+    except Exception:
+        return {}
+
+
+def persona_instructions(persona_profile: Dict[str, Any]) -> str:
+    if not persona_profile:
+        return ""
 
     return (
-        "You are an AI language and cross-cultural communication assistant. "
-        f"Follow this style: {style} "
-        f"Keep explanations/meta in the user's native language ({native_lang}); "
-        f"produce examples and final rewrites in the target language ({target_lang}). "
-        "Be concise, practical, and culturally aware."
+        f"Persona: {persona_profile.get('code', '')}. "
+        f"Style: {persona_profile.get('style', persona_profile.get('style_hint', ''))}."
     )
+
+
+def call_json_chat(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.4,
+) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+    client = get_openai_client()
+
+    if client is None:
+        return (
+            {
+                "mock": True,
+                "message": "OpenAI API key is not set. This is a mock response.",
+            },
+            mock_usage(model),
+            "",
+        )
+
+    response = client.chat.completions.create(
+        model=model or "gpt-4o-mini",
+        temperature=temperature,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    data = safe_json_loads(content)
+
+    return data, usage_from_response(response), content
+
+
+def call_plain_chat(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float = 0.4,
+) -> Tuple[str, Dict[str, Any]]:
+    client = get_openai_client()
+
+    if client is None:
+        return (
+            "AI response mock: OpenAI API key is not set.",
+            mock_usage(model),
+        )
+
+    response = client.chat.completions.create(
+        model=model or "gpt-4o-mini",
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    return content, usage_from_response(response)
 
 
 # =========================
@@ -148,48 +143,58 @@ def build_system_prompt(
 
 def translate_text(
     text: str,
-    source_lang: str,
-    target_lang: str,
-    native_lang: str,
+    source_lang: Lang,
+    target_lang: Lang,
+    native_lang: Lang,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[str, Dict[str, Any], Optional[str]]:
 
-    detected = None
-
-    if source_lang == "auto":
-        detected = detect_language(text)
-
-    actual_source = detected or source_lang
-
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        target_lang,
+    system_prompt = (
+        "You are a helpful cross-cultural translator. "
+        "Keep tone natural, preserve meaning and intent. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    user_prompt = (
-        f"Source language: {actual_source}. "
-        f"Target language: {target_lang}. "
-        f"Translate the message into {target_lang}. "
-        f"Then give short helpful notes in {native_lang}.\n\n"
-        f"Message:\n{text}"
-    )
+    detect_source = source_lang == "auto"
 
-    output, usage = call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
+    prompt = {
+        "task": "translate",
+        "detect_source": detect_source,
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "text": text,
+        "instructions": [
+            "Translate naturally.",
+            "Preserve tone and intent.",
+            "If source_lang is auto, detect the language.",
         ],
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "detected_lang": {"type": ["string", "null"]},
+                "translation": {"type": "string"},
+            },
+            "required": ["translation"],
+        },
+    }
+
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
 
-    if detected:
-        usage["detected_lang"] = detected
+    if data.get("mock"):
+        return data["message"], usage, None
 
-    return output, usage, detected
+    detected = data.get("detected_lang")
+    output = data.get("translation") or raw_content
+
+    return output.strip(), usage, detected
 
 
 # =========================
@@ -198,37 +203,50 @@ def translate_text(
 
 def correct_grammar(
     text: str,
-    target_lang: str,
-    native_lang: str,
+    target_lang: Lang,
+    native_lang: Lang,
     level: str,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        target_lang,
-    )
-
-    user_prompt = (
+    system_prompt = (
+        "You are a grammar coach. "
         f"Target language: {target_lang}. "
         f"Learner level: {level}. "
-        f"Correct the grammar of the following text in {target_lang}. "
-        f"Then explain the main issues in {native_lang}. "
-        f"Provide 1-2 corrected examples in {target_lang}.\n\n"
-        f"Text:\n{text}"
+        f"Explain notes in {native_lang}. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    return call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    prompt = {
+        "task": "grammar_correction",
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "level": level,
+        "text": text,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "clean": {"type": "string"},
+                "notes": {"type": "string"},
+                "examples": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["clean"],
+        },
+    }
+
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
+
+    if not data:
+        data = {"clean": raw_content}
+
+    return data, usage
 
 
 # =========================
@@ -237,77 +255,109 @@ def correct_grammar(
 
 def suggest_natural_expression(
     text: str,
-    target_lang: str,
-    native_lang: str,
+    target_lang: Lang,
+    native_lang: Lang,
     tone_preference: str,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        target_lang,
+    system_prompt = (
+        "You are a natural expression coach. "
+        f"Target language: {target_lang}. "
+        f"Desired tone: {tone_preference}. "
+        f"Explain notes in {native_lang}. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    user_prompt = (
-        f"Rewrite the text in natural {target_lang} "
-        f"with a {tone_preference} tone. "
-        f"Provide 2-3 options. "
-        f"Add short notes in {native_lang} "
-        f"explaining why they sound natural.\n\n"
-        f"Text:\n{text}"
-    )
+    prompt = {
+        "task": "natural_expression",
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "tone": tone_preference,
+        "text": text,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "suggestions": {"type": "array", "items": {"type": "string"}},
+                "tone_notes": {"type": "string"},
+                "better_version": {"type": "string"},
+            },
+            "required": ["better_version"],
+        },
+    }
 
-    return call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
 
+    if not data:
+        data = {"better_version": raw_content}
+
+    return data, usage
+
 
 # =========================
-# Vocabulary Explanation
+# Vocabulary
 # =========================
 
 def explain_vocabulary(
     text: str,
-    target_lang: str,
-    native_lang: str,
+    target_lang: Lang,
+    native_lang: Lang,
     max_items: int,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        target_lang,
+    system_prompt = (
+        "You are a concise vocabulary explainer for language learners. "
+        f"Explain in {native_lang}. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    user_prompt = (
-        f"Extract up to {max_items} important vocabulary items "
-        f"from the text. "
-        f"For each item provide:\n"
-        f"- Original term\n"
-        f"- Meaning in {native_lang}\n"
-        f"- One example sentence in {target_lang}\n\n"
-        f"Text:\n{text}"
-    )
+    prompt = {
+        "task": "vocabulary_explain",
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "max_items": max_items,
+        "text": text,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "term": {"type": "string"},
+                            "meaning": {"type": "string"},
+                            "example": {"type": "string"},
+                        },
+                        "required": ["term", "meaning"],
+                    },
+                }
+            },
+            "required": ["items"],
+        },
+    }
 
-    return call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
+
+    if not data:
+        data = {"items": [], "raw": raw_content}
+
+    return data, usage
 
 
 # =========================
@@ -316,81 +366,309 @@ def explain_vocabulary(
 
 def analyze_tone(
     text: str,
-    lang: str,
-    native_lang: str,
+    lang: Lang,
+    native_lang: Lang,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any]]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        lang,
+    system_prompt = (
+        "You are a tone and intent analyzer. "
+        f"Text language: {lang}. "
+        f"Explain findings in {native_lang}. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    user_prompt = (
-        f"Analyze the tone of the following {lang} text. "
-        f"Describe tone, formality, and cultural cues in {native_lang}. "
-        f"If useful, suggest a small rewrite.\n\n"
-        f"Text:\n{text}"
-    )
+    prompt = {
+        "task": "tone_analysis",
+        "lang": lang,
+        "native_lang": native_lang,
+        "text": text,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "tone_summary": {"type": "string"},
+                "intent": {"type": "string"},
+                "tips": {"type": "string"},
+            },
+            "required": ["tone_summary"],
+        },
+    }
 
-    return call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
 
+    if not data:
+        data = {"tone_summary": raw_content}
+
+    return data, usage
+
 
 # =========================
-# Chat Reply Assistant
+# Chat Reply Assistant - Legacy
 # =========================
 
 def chat_reply_assistant(
     text: str,
-    source_lang: str,
-    target_lang: str,
-    native_lang: str,
+    source_lang: Lang,
+    target_lang: Lang,
+    native_lang: Lang,
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[str, Dict[str, Any], Optional[str]]:
 
-    detected = None
-
-    if source_lang == "auto":
-        detected = detect_language(text)
-
-    actual_source = detected or source_lang
-
-    system_prompt = build_system_prompt(
-        persona_profile,
-        native_lang,
-        target_lang,
+    system_prompt = (
+        "You are a helpful bilingual communication assistant. "
+        f"Generate a natural reply in {target_lang}. "
+        f"Explain only if needed in {native_lang}. "
+        f"{persona_instructions(persona_profile)}"
     )
 
-    user_prompt = (
-        f"The user received a message in {actual_source}. "
-        f"Suggest 2-3 natural replies in {target_lang}. "
-        f"Add short notes in {native_lang} "
-        f"about tone and intent.\n\n"
-        f"Received message:\n{text}"
-    )
+    detect_source = source_lang == "auto"
 
-    output, usage = call_openai(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
+    prompt = {
+        "task": "chat_reply",
+        "detect_source": detect_source,
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "text": text,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "detected_lang": {"type": ["string", "null"]},
+                "reply": {"type": "string"},
+            },
+            "required": ["reply"],
+        },
+    }
+
+    data, usage, raw_content = call_json_chat(
         model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
         temperature=temperature,
     )
 
-    if detected:
-        usage["detected_lang"] = detected
+    if data.get("mock"):
+        return data["message"], usage, None
 
-    return output, usage, detected
+    return data.get("reply", raw_content), usage, data.get("detected_lang")
+
+
+# =========================
+# Advanced AI Chat Coach
+# =========================
+
+def chat_reply_coach_advanced(
+    text: str,
+    source_lang: Lang,
+    target_lang: Lang,
+    native_lang: Lang,
+    reply_style: str,
+    temperature: float,
+    model: str,
+    persona_profile: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+
+    system_prompt = (
+        "You are an advanced AI chat coach. "
+        "Provide exactly 3 concise, natural replies in the target language. "
+        "Also include tone notes, cultural notes, the best recommended reply, and a brief reason. "
+        "Make the output practical for real messaging apps. "
+        f"{persona_instructions(persona_profile)}"
+    )
+
+    detect_source = source_lang == "auto"
+
+    prompt = {
+        "task": "advanced_chat_coach",
+        "detect_source": detect_source,
+        "source_lang": source_lang,
+        "target_lang": target_lang,
+        "native_lang": native_lang,
+        "source_text": text,
+        "reply_style": reply_style,
+        "constraints": {
+            "num_replies": 3,
+            "max_length": "one or two short sentences each",
+        },
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "detected_lang": {"type": ["string", "null"]},
+                "reply_options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string"},
+                            "naturalness_score": {"type": "number"},
+                            "tone": {"type": "string"},
+                        },
+                        "required": ["text"],
+                    },
+                },
+                "tone_notes": {"type": "string"},
+                "cultural_notes": {"type": "string"},
+                "suggested_best_reply": {"type": "string"},
+                "reason": {"type": "string"},
+                "pronunciation_guide": {
+                    "type": "object",
+                    "properties": {
+                        "lang": {"type": "string"},
+                        "text": {"type": "string"},
+                    },
+                },
+            },
+            "required": ["reply_options", "suggested_best_reply"],
+        },
+    }
+
+    data, usage, raw_content = call_json_chat(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
+        temperature=temperature,
+    )
+
+    if data.get("mock"):
+        data = {
+            "reply_options": [
+                {
+                    "text": "Mock reply option 1",
+                    "naturalness_score": 8,
+                    "tone": reply_style,
+                },
+                {
+                    "text": "Mock reply option 2",
+                    "naturalness_score": 8,
+                    "tone": reply_style,
+                },
+                {
+                    "text": "Mock reply option 3",
+                    "naturalness_score": 8,
+                    "tone": reply_style,
+                },
+            ],
+            "tone_notes": "Mock tone notes.",
+            "cultural_notes": "Mock cultural notes.",
+            "suggested_best_reply": "Mock reply option 1",
+            "reason": "OpenAI API key is not set.",
+        }
+        return data, usage, None
+
+    if not data:
+        data = {
+            "reply_options": [{"text": raw_content}],
+            "suggested_best_reply": raw_content,
+        }
+
+    detected = data.get("detected_lang")
+    return data, usage, detected
+
+
+# =========================
+# Media Context Explain
+# =========================
+
+def media_context_explain(
+    text: str,
+    source_lang: Lang,
+    native_lang: Lang,
+    context_type: str,
+    temperature: float,
+    model: str,
+    persona_profile: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+
+    system_prompt = (
+        "You are a media and pop-culture explainer. "
+        "You can explain K-pop lyrics, Korean drama dialogue, Cantonese drama dialogue, "
+        "Chinese drama dialogue, English TV/movie dialogue, internet slang, and pop culture expressions. "
+        "Explain in a way helpful for language learners and cross-cultural communication. "
+        f"{persona_instructions(persona_profile)}"
+    )
+
+    detect_source = source_lang == "auto"
+
+    prompt = {
+        "task": "media_context",
+        "detect_source": detect_source,
+        "source_lang": source_lang,
+        "context_type": context_type,
+        "text": text,
+        "output_lang": native_lang,
+        "return_json_schema": {
+            "type": "object",
+            "properties": {
+                "detected_lang": {"type": ["string", "null"]},
+                "clean_translation": {"type": "string"},
+                "key_phrases": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "phrase": {"type": "string"},
+                            "meaning": {"type": "string"},
+                            "note": {"type": "string"},
+                        },
+                        "required": ["phrase", "meaning"],
+                    },
+                },
+                "slang_pop_culture": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "term": {"type": "string"},
+                            "origin": {"type": "string"},
+                            "note": {"type": "string"},
+                        },
+                        "required": ["term"],
+                    },
+                },
+                "tone_notes": {"type": "string"},
+                "cultural_notes": {"type": "string"},
+                "summary": {"type": "string"},
+                "recommended_understanding": {"type": "string"},
+                "pronunciation_guide": {
+                    "type": "object",
+                    "properties": {
+                        "lang": {"type": "string"},
+                        "text": {"type": "string"},
+                    },
+                },
+            },
+            "required": ["clean_translation"],
+        },
+    }
+
+    data, usage, raw_content = call_json_chat(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
+        temperature=temperature,
+    )
+
+    if data.get("mock"):
+        data = {
+            "clean_translation": "Mock explanation: OpenAI API key is not set.",
+            "key_phrases": [],
+            "slang_pop_culture": [],
+            "summary": "Mock media context explanation.",
+            "recommended_understanding": "Set OPENAI_API_KEY to enable real AI output.",
+        }
+        return data, usage, None
+
+    if not data:
+        data = {"clean_translation": raw_content}
+
+    detected = data.get("detected_lang")
+    return data, usage, detected

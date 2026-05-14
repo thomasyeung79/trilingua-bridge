@@ -4,10 +4,15 @@ import time
 from typing import Optional, List, Dict, Any
 
 
-DB_PATH = os.environ.get("DB_PATH") or "trilingua_bridge.db"
-
-
 def get_db_path() -> str:
+    """
+    Priority:
+    1. Streamlit secrets DB_PATH
+    2. Environment variable DB_PATH
+    3. Environment variable TRILINGUA_DB_PATH
+    4. Default local database
+    """
+
     try:
         import streamlit as st
 
@@ -17,7 +22,11 @@ def get_db_path() -> str:
     except Exception:
         pass
 
-    return DB_PATH
+    return (
+        os.environ.get("DB_PATH")
+        or os.environ.get("TRILINGUA_DB_PATH")
+        or "trilingua_bridge.db"
+    )
 
 
 def get_connection() -> sqlite3.Connection:
@@ -27,7 +36,10 @@ def get_connection() -> sqlite3.Connection:
     if folder and not os.path.exists(folder):
         os.makedirs(folder, exist_ok=True)
 
-    return sqlite3.connect(db_path, check_same_thread=False)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+
+    return conn
 
 
 def init_db():
@@ -39,6 +51,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL,
+            timestamp REAL NOT NULL,
             mode TEXT,
             source_lang TEXT,
             target_lang TEXT,
@@ -50,8 +63,7 @@ def init_db():
             tokens_input INTEGER,
             tokens_output INTEGER,
             model TEXT,
-            latency_ms INTEGER,
-            timestamp INTEGER NOT NULL
+            latency_ms INTEGER
         );
         """
     )
@@ -88,7 +100,7 @@ def insert_history(
     target_lang: Optional[str],
     native_lang: Optional[str],
     persona: Optional[str],
-    ui_lang: str,
+    ui_lang: Optional[str],
     user_input: str,
     ai_output: str,
     tokens_input: Optional[int],
@@ -96,8 +108,6 @@ def insert_history(
     model: Optional[str],
     latency_ms: Optional[int],
 ):
-    timestamp = int(time.time() * 1000)
-
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -105,6 +115,7 @@ def insert_history(
         """
         INSERT INTO history (
             username,
+            timestamp,
             mode,
             source_lang,
             target_lang,
@@ -116,13 +127,13 @@ def insert_history(
             tokens_input,
             tokens_output,
             model,
-            latency_ms,
-            timestamp
+            latency_ms
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             username or "guest",
+            time.time(),
             mode or "",
             source_lang or "",
             target_lang or "",
@@ -135,7 +146,6 @@ def insert_history(
             tokens_output,
             model or "",
             latency_ms,
-            timestamp,
         ),
     )
 
@@ -156,6 +166,7 @@ def fetch_history(
         SELECT
             id,
             username,
+            timestamp,
             mode,
             source_lang,
             target_lang,
@@ -167,13 +178,12 @@ def fetch_history(
             tokens_input,
             tokens_output,
             model,
-            latency_ms,
-            timestamp
+            latency_ms
         FROM history
         WHERE username = ?
     """
 
-    params: List[Any] = [username]
+    params: List[Any] = [username or "guest"]
 
     if mode:
         query += " AND mode = ?"
@@ -201,30 +211,10 @@ def fetch_history(
 
     conn = get_connection()
     cursor = conn.cursor()
-    rows = cursor.execute(query, params).fetchall()
+    cursor.execute(query, params)
+
+    rows = [dict(row) for row in cursor.fetchall()]
+
     conn.close()
 
-    columns = [
-        "id",
-        "username",
-        "mode",
-        "source_lang",
-        "target_lang",
-        "native_lang",
-        "persona",
-        "ui_lang",
-        "user_input",
-        "ai_output",
-        "tokens_input",
-        "tokens_output",
-        "model",
-        "latency_ms",
-        "timestamp",
-    ]
-
-    history: List[Dict[str, Any]] = []
-
-    for row in rows:
-        history.append(dict(zip(columns, row)))
-
-    return history
+    return rows

@@ -5,6 +5,13 @@ from typing import Dict, Any, Callable, Optional
 import streamlit as st
 from dotenv import load_dotenv
 
+try:
+    from streamlit_mic_recorder import mic_recorder
+    MIC_SUPPORTED = True
+except Exception:
+    mic_recorder = None
+    MIC_SUPPORTED = False
+
 from ui_helper import (
     TEXTS,
     UI_LANGS,
@@ -40,6 +47,13 @@ from ai_helper import (
     media_context_explain,
 )
 
+try:
+    from ai_helper import analyze_screenshot_chat
+    HAVE_SCREENSHOT_ANALYZE = True
+except Exception:
+    analyze_screenshot_chat = None
+    HAVE_SCREENSHOT_ANALYZE = False
+
 from audio_helper import (
     to_pronunciation,
     synthesize_tts,
@@ -52,9 +66,55 @@ load_dotenv()
 st.set_page_config(
     page_title="TriLingua Bridge",
     layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 inject_css()
+
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    [data-testid="collapsedControl"] {
+        display: none;
+    }
+
+    .topbar {
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 16px rgba(16, 24, 40, 0.04);
+    }
+
+    .settings-card {
+        border: 1px solid #e5e7eb;
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 4px 16px rgba(16, 24, 40, 0.04);
+    }
+
+    .settings-title {
+        font-weight: 700;
+        font-size: 1.05rem;
+        margin-bottom: 8px;
+    }
+
+    .settings-sub {
+        color: #6b7280;
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # =========================
@@ -72,6 +132,7 @@ def init_state():
         "temperature": 0.4,
         "model_input": "gpt-4o-mini",
         "show_pron": False,
+        "coach_region_mode": "cn-mainland",
     }
 
     for key, value in defaults.items():
@@ -97,9 +158,22 @@ except Exception as e:
 # =========================
 
 def go_home_button():
-    if st.button(f"🏠 {t('back_home')}", use_container_width=True):
-        st.session_state.page = "Home"
-        st.rerun()
+    col1, col2 = st.columns([1, 3])
+
+    with col1:
+        if st.button(f"🏠 {t('back_home')}", use_container_width=True):
+            st.session_state.page = "Home"
+            st.rerun()
+
+    with col2:
+        display = get_lang_display()
+        native_label = display.get(st.session_state.native_lang, st.session_state.native_lang)
+        target_label = display.get(st.session_state.target_lang, st.session_state.target_lang)
+        st.caption(
+            f"{st.session_state.username} · "
+            f"{native_label} → {target_label} · "
+            f"{persona_display(st.session_state.persona_code)}"
+        )
 
 
 def get_persona_profile(source_lang: str, target_lang: str) -> Dict[str, Any]:
@@ -109,6 +183,16 @@ def get_persona_profile(source_lang: str, target_lang: str) -> Dict[str, Any]:
         target_lang=target_lang,
         ui_lang=st.session_state.ui_lang,
     )
+
+
+def lang_for_stt(lang_code: Optional[str]) -> Optional[str]:
+    if not lang_code or lang_code == "auto":
+        return None
+
+    if lang_code == "yue":
+        return "zh"
+
+    return lang_code
 
 
 def make_meaning_prompt(text: str, source_lang: str, native_lang: str) -> str:
@@ -174,7 +258,7 @@ def run_ai_task(
             output = task_fn(**task_kwargs)
     except Exception as e:
         st.error(f"{t('ai_call_failed')}: {e}")
-        return
+        return None
 
     usage: Dict[str, Any] = {}
     detected = None
@@ -262,6 +346,8 @@ def run_ai_task(
     except Exception as e:
         st.warning(f"{t('history_save_failed')}: {e}")
 
+    return result, usage
+
 
 def voice_input_ui(text_area_key: str):
     with st.expander(f"🎙️ {t('voice_input')}", expanded=False):
@@ -285,176 +371,472 @@ def voice_input_ui(text_area_key: str):
 
         if st.button(t("transcribe"), key=f"transcribe_{text_area_key}"):
             if not uploaded_file:
-                st.warning(t("upload_audio"))
-                return
-
-            with st.spinner(t("transcribing")):
-                audio_data = uploaded_file.read()
-                transcript = transcribe_audio(
-                    audio_data,
-                    uploaded_file.name,
-                    None if lang_option == "auto" else lang_option,
+                msg = TEXTS.get(st.session_state.ui_lang, {}).get(
+                    "please_upload_audio_first",
+                    "Please upload an audio file first.",
                 )
-
-            if transcript:
-                st.session_state[text_area_key] = transcript
-                st.success(t("ok"))
-                st.rerun()
+                st.warning(msg)
             else:
-                st.warning(t("stt_unavailable"))
+                with st.spinner(t("transcribing")):
+                    audio_data = uploaded_file.read()
+                    transcript = transcribe_audio(
+                        audio_data,
+                        uploaded_file.name,
+                        lang_for_stt(lang_option),
+                    )
+
+                if transcript:
+                    st.session_state[text_area_key] = transcript
+                    st.success(t("ok"))
+                    st.rerun()
+                else:
+                    st.warning(t("stt_unavailable"))
+
+        st.markdown("---")
+
+        st.caption(
+            TEXTS.get(st.session_state.ui_lang, {}).get(
+                "live_mic_note",
+                "Record from microphone.",
+            )
+        )
+
+        if MIC_SUPPORTED:
+            mic_data = mic_recorder(
+                start_prompt=TEXTS.get(st.session_state.ui_lang, {}).get(
+                    "start_recording",
+                    "Start recording",
+                ),
+                stop_prompt=TEXTS.get(st.session_state.ui_lang, {}).get(
+                    "stop_recording",
+                    "Stop",
+                ),
+                just_once=True,
+                format="wav",
+                key=f"mic_{text_area_key}",
+            )
+
+            if mic_data and isinstance(mic_data, dict) and mic_data.get("bytes"):
+                st.audio(mic_data["bytes"], format="audio/wav")
+
+                with st.spinner(t("transcribing")):
+                    transcript = transcribe_audio(
+                        mic_data["bytes"],
+                        "mic.wav",
+                        lang_for_stt(lang_option),
+                    )
+
+                if transcript:
+                    st.session_state[text_area_key] = transcript
+                    st.success(t("ok"))
+                    st.rerun()
+                else:
+                    st.warning(t("stt_unavailable"))
+
+        else:
+            st.info(
+                TEXTS.get(st.session_state.ui_lang, {}).get(
+                    "mic_not_installed",
+                    "Live mic not available. Install streamlit-mic-recorder.",
+                )
+            )
 
 
 # =========================
-# Sidebar
+# Regional / Cultural Coach
 # =========================
 
-ui_label = TEXTS[st.session_state.ui_lang]["ui_language"]
-ui_options = [UI_LANG_DISPLAY[code] for code in UI_LANGS]
-current_ui_index = UI_LANGS.index(st.session_state.ui_lang)
-
-selected_ui_label = st.sidebar.selectbox(
-    ui_label,
-    ui_options,
-    index=current_ui_index,
-    key="ui_lang_select",
-)
-
-selected_ui_code = UI_LANGS[ui_options.index(selected_ui_label)]
-
-if selected_ui_code != st.session_state.ui_lang:
-    st.session_state.ui_lang = selected_ui_code
-    st.rerun()
+REGION_OPTIONS = [
+    ("cn-mainland", "region_mainland_cn"),
+    ("hk-cantonese", "region_hk_yue"),
+    ("kr", "region_korean"),
+    ("au-en", "region_au_en"),
+    ("us-en", "region_us_en"),
+]
 
 
-st.sidebar.markdown(
-    f'<div class="sb-title">{t("account_title")}</div>',
-    unsafe_allow_html=True,
-)
-st.sidebar.markdown(
-    f'<div class="sb-sub">{t("account_note")}</div>',
-    unsafe_allow_html=True,
-)
+def region_label(code: str) -> str:
+    key_map = dict(REGION_OPTIONS)
+    key = key_map.get(code, code)
+    return TEXTS.get(st.session_state.ui_lang, {}).get(key, code)
 
-col_user, col_login = st.sidebar.columns([3, 1])
 
-with col_user:
-    username_input = st.text_input(
-        t("username"),
-        value=st.session_state.username,
-        key="username_input",
+def build_region_guidelines(region_code: str, target_lang: str) -> str:
+    if region_code == "cn-mainland":
+        return (
+            "Mainland Chinese mode: Use Mandarin-friendly wording, moderate politeness, "
+            "limited emojis, indirect suggestions, concise 1–3 sentences."
+        )
+
+    if region_code == "hk-cantonese":
+        return (
+            "Hong Kong Cantonese mode: Use Cantonese expressions with Traditional Chinese, "
+            "casual but polite tone, light emojis ok, direct but friendly."
+        )
+
+    if region_code == "kr":
+        return (
+            "Korean mode: Adapt honorifics properly, polite endings if not close, "
+            "avoid excessive emojis, indirect yet clear."
+        )
+
+    if region_code == "au-en":
+        return (
+            "Australian English mode: Friendly, relaxed phrasing, light emoji ok, "
+            "direct yet casual tone."
+        )
+
+    if region_code == "us-en":
+        return (
+            "American English mode: Friendly, upbeat tone, clear and direct wording."
+        )
+
+    return "Adjust wording, politeness, emoji use, directness, length, and tone appropriately."
+
+
+# =========================
+# Naturalness
+# =========================
+
+def detect_language_code(
+    text: str,
+    model: str,
+    temperature: float,
+    persona_profile: Dict[str, Any],
+) -> Optional[str]:
+    try:
+        prompt = (
+            "You are a strict language identifier.\n"
+            "Return only one code from this set: zh, yue, ko, en.\n"
+            "If the text is Traditional Chinese and clearly Cantonese, return yue.\n"
+            "Output exactly the code, nothing else.\n\n"
+            f"Text:\n{text}"
+        )
+
+        out = translate_text(
+            text=prompt,
+            source_lang="en",
+            target_lang="en",
+            native_lang="en",
+            temperature=max(0.0, min(temperature, 0.2)),
+            model=model,
+            persona_profile=persona_profile,
+        )
+
+        result = out[0] if isinstance(out, tuple) else out
+        code = (result or "").strip().lower()
+
+        return code if code in ("zh", "yue", "ko", "en") else None
+
+    except Exception:
+        return None
+
+
+def evaluate_naturalness(
+    sentence: str,
+    eval_lang: str,
+    native_lang: str,
+    model: str,
+    temperature: float,
+    persona_profile: Dict[str, Any],
+) -> Dict[str, Any]:
+    prompt = (
+        "Task: Evaluate how natural this sentence sounds.\n"
+        "Return ONLY valid JSON with keys: verdict, score, reason, suggestion.\n"
+        "verdict must be one of: natural, somewhat_natural, machine_translated.\n"
+        "score must be an integer from 1 to 10.\n"
+        "reason should be in the user's native language.\n"
+        "suggestion should be a more natural version in the same language as the sentence.\n\n"
+        f"User native language: {native_lang}\n"
+        f"Sentence language: {eval_lang}\n\n"
+        f"Sentence:\n{sentence}"
     )
 
-with col_login:
-    if st.button(t("login"), use_container_width=True):
-        st.session_state.username = username_input.strip()
-        st.rerun()
-
-
-if not st.session_state.username:
-    hero(t("app_title"), t("subtitle"), t("not_social"))
-    st.caption(t("account_note"))
-    st.stop()
-
-
-st.sidebar.success(f"{t('username')}: {st.session_state.username}")
-
-if st.sidebar.button(t("logout"), use_container_width=True):
-    st.session_state.username = ""
-    st.rerun()
-
-
-with st.sidebar.expander(t("prefs_title"), expanded=True):
-    native_lang = st.selectbox(
-        t("my_native"),
-        STUDY_LANG_CODES,
-        index=STUDY_LANG_CODES.index(st.session_state.native_lang),
-        format_func=lang_label,
-        key="native_lang_select",
+    out = translate_text(
+        text=prompt,
+        source_lang="en",
+        target_lang=native_lang,
+        native_lang=native_lang,
+        temperature=max(0.0, min(temperature, 0.5)),
+        model=model,
+        persona_profile=persona_profile,
     )
-    st.session_state.native_lang = native_lang
 
-    target_lang = st.selectbox(
-        t("i_learn"),
-        STUDY_LANG_CODES,
-        index=STUDY_LANG_CODES.index(st.session_state.target_lang),
-        format_func=lang_label,
-        key="target_lang_select",
-    )
-    st.session_state.target_lang = target_lang
+    content = out[0] if isinstance(out, tuple) else out
 
-    persona_code = st.selectbox(
-        t("persona"),
-        PERSONA_CODES,
-        index=PERSONA_CODES.index(st.session_state.persona_code),
-        format_func=persona_display,
-        key="persona_code_select",
-    )
-    st.session_state.persona_code = persona_code
+    data = {
+        "verdict": "",
+        "score": None,
+        "reason": "",
+        "suggestion": "",
+    }
 
-    temperature = st.slider(
-        t("creativity"),
-        0.0,
-        1.0,
-        st.session_state.temperature,
-        0.1,
-        key="temperature_slider",
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            data.update(
+                {
+                    "verdict": parsed.get("verdict", ""),
+                    "score": parsed.get("score", None),
+                    "reason": parsed.get("reason", ""),
+                    "suggestion": parsed.get("suggestion", ""),
+                }
+            )
+    except Exception:
+        data["verdict"] = "somewhat_natural"
+        data["score"] = 6
+        data["reason"] = str(content)[:200]
+        data["suggestion"] = ""
+
+    return data
+
+
+def render_naturalness_panel(title: str, eval_data: Dict[str, Any]):
+    verdict = eval_data.get("verdict") or "-"
+
+    try:
+        score = int(eval_data.get("score")) if eval_data.get("score") is not None else "-"
+    except Exception:
+        score = "-"
+
+    reason = eval_data.get("reason") or "-"
+    suggestion = eval_data.get("suggestion") or ""
+
+    st.markdown('<div class="output-wrap">', unsafe_allow_html=True)
+    st.markdown(f"**{title}**")
+    st.write(
+        f"{TEXTS.get(st.session_state.ui_lang, {}).get('naturalness_verdict', 'Verdict')}: {verdict}"
     )
-    st.session_state.temperature = temperature
+    st.write(
+        f"{TEXTS.get(st.session_state.ui_lang, {}).get('naturalness_score', 'Score')}: {score}"
+    )
+    st.write(
+        f"{TEXTS.get(st.session_state.ui_lang, {}).get('naturalness_reason', 'Why')}: {reason}"
+    )
+
+    if suggestion:
+        st.write(
+            TEXTS.get(st.session_state.ui_lang, {}).get(
+                "naturalness_suggestion",
+                "More natural version",
+            )
+        )
+        st.markdown(suggestion)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================
+# Home Dashboard
+# =========================
+
+def render_home_dashboard():
+    hero(
+        t("app_title"),
+        TEXTS.get(st.session_state.ui_lang, {}).get("subtitle_v2", t("subtitle")),
+        t("not_social"),
+    )
+
+    st.markdown('<div class="settings-card">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="settings-title">{t("account_title")}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="settings-sub">{t("account_note")}</div>',
+        unsafe_allow_html=True,
+    )
+
+    col_user, col_login, col_logout = st.columns([3, 1, 1])
+
+    with col_user:
+        username_input = st.text_input(
+            t("username"),
+            value=st.session_state.username,
+            key="home_username_input",
+        )
+
+    with col_login:
+        if st.button(t("login"), use_container_width=True, key="home_login_btn"):
+            st.session_state.username = username_input.strip()
+            st.rerun()
+
+    with col_logout:
+        if st.session_state.username:
+            if st.button(t("logout"), use_container_width=True, key="home_logout_btn"):
+                st.session_state.username = ""
+                st.rerun()
+
+    if st.session_state.username:
+        st.success(f"{t('username')}: {st.session_state.username}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div class="settings-card">', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="settings-title">{t("prefs_title")}</div>',
+        unsafe_allow_html=True,
+    )
+
+    ui_options = [UI_LANG_DISPLAY[code] for code in UI_LANGS]
+    current_ui_index = UI_LANGS.index(st.session_state.ui_lang)
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        selected_ui_label = st.selectbox(
+            t("ui_language"),
+            ui_options,
+            index=current_ui_index,
+            key="home_ui_lang_select",
+        )
+        selected_ui_code = UI_LANGS[ui_options.index(selected_ui_label)]
+
+        if selected_ui_code != st.session_state.ui_lang:
+            st.session_state.ui_lang = selected_ui_code
+            st.rerun()
+
+    with col2:
+        native_lang = st.selectbox(
+            t("my_native"),
+            STUDY_LANG_CODES,
+            index=STUDY_LANG_CODES.index(st.session_state.native_lang),
+            format_func=lang_label,
+            key="home_native_lang_select",
+        )
+        st.session_state.native_lang = native_lang
+
+    with col3:
+        target_lang = st.selectbox(
+            t("i_learn"),
+            STUDY_LANG_CODES,
+            index=STUDY_LANG_CODES.index(st.session_state.target_lang),
+            format_func=lang_label,
+            key="home_target_lang_select",
+        )
+        st.session_state.target_lang = target_lang
+
+    col4, col5, col6 = st.columns(3)
+
+    with col4:
+        persona_code = st.selectbox(
+            t("persona"),
+            PERSONA_CODES,
+            index=PERSONA_CODES.index(st.session_state.persona_code),
+            format_func=persona_display,
+            key="home_persona_code_select",
+        )
+        st.session_state.persona_code = persona_code
+
+    with col5:
+        temperature = st.slider(
+            t("creativity"),
+            0.0,
+            1.0,
+            st.session_state.temperature,
+            0.1,
+            key="home_temperature_slider",
+        )
+        st.session_state.temperature = temperature
+
+    with col6:
+        show_pron = st.checkbox(
+            t("show_pron"),
+            value=st.session_state.show_pron,
+            key="home_show_pron_checkbox",
+        )
+        st.session_state.show_pron = show_pron
 
     model = st.text_input(
         t("model"),
         value=st.session_state.model_input,
-        key="model_input_text",
+        key="home_model_input_text",
     )
     st.session_state.model_input = model
 
-    show_pron = st.checkbox(
-        t("show_pron"),
-        value=st.session_state.show_pron,
-        key="show_pron_checkbox",
+    st.caption(t("tip"))
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if not st.session_state.username:
+        st.info(t("account_note"))
+        return
+
+    section_header(
+        TEXTS.get(st.session_state.ui_lang, {}).get("what_can_v2", t("what_can")),
+        t("what_can_sub"),
     )
-    st.session_state.show_pron = show_pron
 
-st.sidebar.info(t("tip"))
+    col1, col2, col3 = st.columns(3)
+
+    with col2:
+        if feature_card(
+            TEXTS.get(st.session_state.ui_lang, {}).get("mode_coach_v2", t("mode_coach")),
+            TEXTS.get(st.session_state.ui_lang, {}).get("mode_coach_sub_v2", t("mode_coach_sub")),
+            "🎯",
+            key="card_coach_v2",
+        ):
+            st.session_state.page = "Coach"
+            st.rerun()
+
+    col4, col5, col6 = st.columns(3)
+
+    with col4:
+        if feature_card(t("mode_say"), t("mode_say_sub"), "🗣️", key="card_say"):
+            st.session_state.page = "Say"
+            st.rerun()
+
+    with col5:
+        if feature_card(t("mode_mean"), t("mode_mean_sub"), "❓", key="card_mean"):
+            st.session_state.page = "Mean"
+            st.rerun()
+
+    with col6:
+        if feature_card(t("mode_kpop"), t("mode_kpop_sub"), "🎵", key="card_media"):
+            st.session_state.page = "Kpop"
+            st.rerun()
+
+    col7, col8, col9 = st.columns(3)
+
+    with col7:
+        if feature_card(t("feature_translate"), t("tip"), "🌐", key="card_translate"):
+            st.session_state.page = "Translate"
+            st.rerun()
+
+    with col8:
+        if feature_card(t("feature_grammar"), t("feature_grammar_sub"), "✍️", key="card_grammar"):
+            st.session_state.page = "Grammar"
+            st.rerun()
+
+    with col9:
+        if feature_card(t("feature_natural"), t("feature_natural_sub"), "🎯", key="card_natural"):
+            st.session_state.page = "Natural"
+            st.rerun()
+
+    col10, col11, col12 = st.columns(3)
+
+    with col10:
+        if feature_card(t("feature_vocab"), t("feature_vocab_sub"), "📚", key="card_vocab"):
+            st.session_state.page = "Vocabulary"
+            st.rerun()
+
+    with col11:
+        if feature_card(t("feature_tone"), t("feature_tone_sub"), "🗣️", key="card_tone"):
+            st.session_state.page = "Tone"
+            st.rerun()
+
+    with col12:
+        if feature_card(t("nav_history"), t("history_sub"), "🕘", key="card_history"):
+            st.session_state.page = "History"
+            st.rerun()
+
+    if st.button(f"ℹ️ {t('nav_about')}", use_container_width=True, key="card_about"):
+        st.session_state.page = "About"
+        st.rerun()
 
 
 # =========================
-# Navigation
+# Page Routing
 # =========================
-
-NAV_ITEMS = [
-    ("Home", f"🏠 {t('nav_home')}"),
-    ("Say", f"🗣️ {t('mode_say')}"),
-    ("Mean", f"❓ {t('mode_mean')}"),
-    ("Coach", f"🎯 {t('mode_coach')}"),
-    ("Kpop", f"🎵 {t('mode_kpop')}"),
-    ("Translate", f"🌐 {t('feature_translate')}"),
-    ("Grammar", f"✍️ {t('feature_grammar')}"),
-    ("Natural", f"🎯 {t('feature_natural')}"),
-    ("Vocabulary", f"📚 {t('feature_vocab')}"),
-    ("Tone", f"🗣️ {t('feature_tone')}"),
-    ("History", f"🕘 {t('nav_history')}"),
-    ("About", f"ℹ️ {t('nav_about')}"),
-]
-
-nav_labels = [label for _, label in NAV_ITEMS]
-page_from_label = {label: page_id for page_id, label in NAV_ITEMS}
-label_from_page = {page_id: label for page_id, label in NAV_ITEMS}
-
-selected_label = st.sidebar.radio(
-    t("nav_title"),
-    nav_labels,
-    index=nav_labels.index(
-        label_from_page.get(st.session_state.page, nav_labels[0])
-    ),
-)
-
-selected_page = page_from_label[selected_label]
-
-if selected_page != st.session_state.page:
-    st.session_state.page = selected_page
-    st.rerun()
-
 
 page = st.session_state.page
 username = st.session_state.username
@@ -464,85 +846,13 @@ persona_code = st.session_state.persona_code
 temperature = st.session_state.temperature
 model = st.session_state.model_input
 
+if page != "Home" and not username:
+    st.session_state.page = "Home"
+    st.rerun()
 
-# =========================
-# Pages
-# =========================
 
 if page == "Home":
-    hero(t("app_title"), t("subtitle"), t("not_social"))
-    section_header(t("what_can"), t("what_can_sub"))
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        if feature_card(t("mode_coach"), t("mode_coach_sub"), "🎯", key="card_coach"):
-            st.session_state.page = "Coach"
-            st.rerun()
-
-    with col2:
-        if feature_card(t("mode_say"), t("mode_say_sub"), "🗣️", key="card_say"):
-            st.session_state.page = "Say"
-            st.rerun()
-
-    with col3:
-        if feature_card(t("mode_mean"), t("mode_mean_sub"), "❓", key="card_mean"):
-            st.session_state.page = "Mean"
-            st.rerun()
-
-    col4, col5, col6 = st.columns(3)
-
-    with col4:
-        if feature_card(t("mode_kpop"), t("mode_kpop_sub"), "🎵", key="card_media"):
-            st.session_state.page = "Kpop"
-            st.rerun()
-
-    with col5:
-        if feature_card(t("feature_translate"), t("tip"), "🌐", key="card_translate"):
-            st.session_state.page = "Translate"
-            st.rerun()
-
-    with col6:
-        if feature_card(
-            t("feature_grammar"),
-            t("feature_grammar_sub"),
-            "✍️",
-            key="card_grammar",
-        ):
-            st.session_state.page = "Grammar"
-            st.rerun()
-
-    col7, col8, col9 = st.columns(3)
-
-    with col7:
-        if feature_card(
-            t("feature_natural"),
-            t("feature_natural_sub"),
-            "🎯",
-            key="card_natural",
-        ):
-            st.session_state.page = "Natural"
-            st.rerun()
-
-    with col8:
-        if feature_card(
-            t("feature_vocab"),
-            t("feature_vocab_sub"),
-            "📚",
-            key="card_vocab",
-        ):
-            st.session_state.page = "Vocabulary"
-            st.rerun()
-
-    with col9:
-        if feature_card(
-            t("feature_tone"),
-            t("feature_tone_sub"),
-            "🗣️",
-            key="card_tone",
-        ):
-            st.session_state.page = "Tone"
-            st.rerun()
+    render_home_dashboard()
 
 
 elif page in ["Say", "Translate"]:
@@ -621,13 +931,13 @@ elif page in ["Mean", "Coach", "Kpop"]:
 
     title_map = {
         "Mean": t("mode_mean"),
-        "Coach": t("mode_coach"),
+        "Coach": TEXTS.get(st.session_state.ui_lang, {}).get("mode_coach_v2", t("mode_coach")),
         "Kpop": t("mode_kpop"),
     }
 
     sub_map = {
         "Mean": t("mode_mean_sub"),
-        "Coach": t("mode_coach_sub"),
+        "Coach": TEXTS.get(st.session_state.ui_lang, {}).get("mode_coach_sub_v2", t("mode_coach_sub")),
         "Kpop": t("mode_kpop_sub"),
     }
 
@@ -640,6 +950,43 @@ elif page in ["Mean", "Coach", "Kpop"]:
     section_header(title_map[page], sub_map[page])
 
     text_key = f"{mode_map[page]}_text"
+
+    if page == "Coach":
+        region_code = st.session_state.get("coach_region_mode", "cn-mainland")
+
+        reg_col1, reg_col2 = st.columns([2, 2])
+
+        with reg_col1:
+            region_code = st.selectbox(
+                TEXTS.get(st.session_state.ui_lang, {}).get("region_mode", "Regional mode"),
+                [code for code, _ in REGION_OPTIONS],
+                index=(
+                    [code for code, _ in REGION_OPTIONS].index(region_code)
+                    if region_code in [code for code, _ in REGION_OPTIONS]
+                    else 0
+                ),
+                format_func=region_label,
+                key="coach_region_mode",
+            )
+
+        with reg_col2:
+            styles = [
+                t("style_friend"),
+                t("style_crush"),
+                t("style_work"),
+                t("style_formal"),
+                t("style_cute"),
+                t("style_cold"),
+                t("style_kpop"),
+                t("style_hk"),
+            ]
+
+            reply_style = st.selectbox(
+                t("relation_mode"),
+                styles,
+                index=0,
+                key="coach_style_select",
+            )
 
     st.markdown('<div class="input-wrap">', unsafe_allow_html=True)
     text = st.text_area(t("input_text"), height=180, key=text_key)
@@ -698,25 +1045,99 @@ elif page in ["Mean", "Coach", "Kpop"]:
             )
 
         with col2:
-            styles = [
-                t("style_friend"),
-                t("style_crush"),
-                t("style_work"),
-                t("style_formal"),
-                t("style_cute"),
-                t("style_cold"),
-                t("style_kpop"),
-                t("style_hk"),
-            ]
+            run_button = st.button(t("run"), use_container_width=True)
 
-            reply_style = st.selectbox(
-                t("relation_mode"),
-                styles,
-                index=0,
-                key="coach_style_select",
+        with st.expander(
+            TEXTS.get(st.session_state.ui_lang, {}).get(
+                "screenshot_mode",
+                "📷 Analyze chat screenshot",
+            ),
+            expanded=False,
+        ):
+            s_col1, s_col2 = st.columns(2)
+
+            with s_col1:
+                ss_lang = st.selectbox(
+                    t("language_of_text"),
+                    ["auto"] + STUDY_LANG_CODES,
+                    index=0,
+                    format_func=lambda code: (
+                        t("auto_detect")
+                        if code == "auto"
+                        else get_lang_display().get(code, code)
+                    ),
+                    key="screenshot_lang",
+                )
+
+            with s_col2:
+                analyze_btn = st.button(
+                    TEXTS.get(st.session_state.ui_lang, {}).get(
+                        "analyze_screenshot_btn",
+                        "Analyze screenshot",
+                    ),
+                    use_container_width=True,
+                    key="btn_analyze_screenshot",
+                )
+
+            image_file = st.file_uploader(
+                TEXTS.get(st.session_state.ui_lang, {}).get(
+                    "upload_screenshot",
+                    "Upload a chat screenshot",
+                ),
+                type=["png", "jpg", "jpeg", "webp"],
+                key="screenshot_uploader",
             )
 
-        run_button = st.button(t("run"), use_container_width=True)
+            if analyze_btn:
+                if not image_file:
+                    st.warning(
+                        TEXTS.get(st.session_state.ui_lang, {}).get(
+                            "please_upload_image_first",
+                            "Please upload an image first.",
+                        )
+                    )
+                else:
+                    image_data = image_file.read()
+                    persona_profile = get_persona_profile(ss_lang, native_lang)
+                    persona_profile["region_mode"] = region_code
+                    persona_profile["region_guidelines"] = build_region_guidelines(
+                        region_code,
+                        target_lang,
+                    )
+
+                    if HAVE_SCREENSHOT_ANALYZE and callable(analyze_screenshot_chat):
+                        run_ai_task(
+                            task_fn=analyze_screenshot_chat,
+                            task_kwargs=dict(
+                                image_bytes=image_data,
+                                image_name=image_file.name,
+                                assumed_lang=None if ss_lang == "auto" else ss_lang,
+                                native_lang=native_lang,
+                                target_lang=target_lang,
+                                region_mode=region_code,
+                                temperature=temperature,
+                                model=model,
+                                persona_profile=persona_profile,
+                            ),
+                            history_kwargs=dict(
+                                username=username,
+                                mode="screenshot",
+                                source_lang=ss_lang,
+                                target_lang=native_lang,
+                                native_lang=native_lang,
+                                persona_code=persona_code,
+                                ui_lang=st.session_state.ui_lang,
+                                user_input=f"[screenshot] {image_file.name}",
+                            ),
+                            pron_lang=None,
+                        )
+                    else:
+                        st.warning(
+                            TEXTS.get(st.session_state.ui_lang, {}).get(
+                                "screenshot_not_available",
+                                "Screenshot analysis is not available. Please update ai_helper.",
+                            )
+                        )
 
     else:
         col1, col2 = st.columns(2)
@@ -740,18 +1161,26 @@ elif page in ["Mean", "Coach", "Kpop"]:
     if run_button:
         if not text.strip():
             st.warning(t("enter_text_warn"))
+
         else:
             if page == "Coach":
                 persona_profile = get_persona_profile(source_choice, target_lang)
+                persona_profile["region_mode"] = region_code
+                persona_profile["region_guidelines"] = build_region_guidelines(
+                    region_code,
+                    target_lang,
+                )
 
-                run_ai_task(
+                style_with_region = f"{reply_style} | region_mode={region_code}"
+
+                result_pair = run_ai_task(
                     task_fn=chat_reply_coach_advanced,
                     task_kwargs=dict(
                         text=text,
                         source_lang=source_choice,
                         target_lang=target_lang,
                         native_lang=native_lang,
-                        reply_style=reply_style,
+                        reply_style=style_with_region,
                         temperature=temperature,
                         model=model,
                         persona_profile=persona_profile,
@@ -768,6 +1197,33 @@ elif page in ["Mean", "Coach", "Kpop"]:
                     ),
                     pron_lang=target_lang,
                 )
+
+                try:
+                    detected_code = (
+                        detect_language_code(text, model, temperature, persona_profile)
+                        or source_choice
+                    )
+
+                    if detected_code in ("zh", "yue", "ko", "en"):
+                        eval_data = evaluate_naturalness(
+                            sentence=text,
+                            eval_lang=detected_code,
+                            native_lang=native_lang,
+                            model=model,
+                            temperature=temperature,
+                            persona_profile=persona_profile,
+                        )
+
+                        render_naturalness_panel(
+                            TEXTS.get(st.session_state.ui_lang, {}).get(
+                                "naturalness_score_title",
+                                "Naturalness Score",
+                            ),
+                            eval_data,
+                        )
+
+                except Exception:
+                    pass
 
             elif page == "Mean":
                 persona_profile = get_persona_profile(source_choice, native_lang)
@@ -924,6 +1380,26 @@ elif page == "Natural":
                 pron_lang=target_lang,
             )
 
+            try:
+                eval_data = evaluate_naturalness(
+                    sentence=text,
+                    eval_lang=target_lang,
+                    native_lang=native_lang,
+                    model=model,
+                    temperature=temperature,
+                    persona_profile=persona_profile,
+                )
+
+                render_naturalness_panel(
+                    TEXTS.get(st.session_state.ui_lang, {}).get(
+                        "naturalness_score_title",
+                        "Naturalness Score",
+                    ),
+                    eval_data,
+                )
+            except Exception:
+                pass
+
 
 elif page == "Vocabulary":
     go_home_button()
@@ -1047,6 +1523,7 @@ elif page == "History":
                 "natural",
                 "vocabulary",
                 "tone",
+                "screenshot",
             ],
             index=0,
         )
@@ -1100,17 +1577,20 @@ elif page == "History":
         for row in rows:
             timestamp = row.get("timestamp")
 
-            if isinstance(timestamp, (int, float)):
-                timestamp_value = (
-                    timestamp / 1000
-                    if timestamp and timestamp > 1e12
-                    else timestamp
-                )
-                timestamp_text = time.strftime(
-                    "%Y-%m-%d %H:%M:%S",
-                    time.localtime(timestamp_value),
-                )
-            else:
+            try:
+                if isinstance(timestamp, (int, float)):
+                    timestamp_value = (
+                        timestamp / 1000
+                        if timestamp and timestamp > 1e12
+                        else timestamp
+                    )
+                    timestamp_text = time.strftime(
+                        "%Y-%m-%d %H:%M:%S",
+                        time.localtime(timestamp_value),
+                    )
+                else:
+                    timestamp_text = str(timestamp)
+            except Exception:
                 timestamp_text = str(timestamp)
 
             mode_value = row.get("mode", "")

@@ -21,16 +21,24 @@ except Exception:
 DetectorFactory.seed = 0
 
 
+def get_secret_value(key: str) -> Optional[str]:
+    value = os.environ.get(key)
+
+    try:
+        import streamlit as st
+
+        value = st.secrets.get(key) or value
+    except Exception:
+        pass
+
+    return value
+
+
+def get_openai_api_key() -> Optional[str]:
+    return get_secret_value("OPENAI_API_KEY")
+
+
 def to_pronunciation(text: str, lang: str) -> str:
-    """
-    Convert text into pronunciation guide.
-
-    zh  -> Mandarin Pinyin
-    yue -> Cantonese Jyutping
-    ko  -> Korean Romanization
-    en  -> English IPA
-    """
-
     text = text or ""
 
     if not text.strip():
@@ -95,15 +103,33 @@ def to_pronunciation(text: str, lang: str) -> str:
         return text
 
 
-def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
-    """
-    Generate MP3 audio bytes using gTTS.
+def synthesize_openai_tts(text: str, lang: str) -> Optional[bytes]:
+    api_key = get_openai_api_key()
 
-    Note:
-    gTTS does not have strong Cantonese support.
-    For yue, this version falls back to zh-CN.
-    """
+    if not api_key:
+        return None
 
+    text = text or ""
+
+    if not text.strip():
+        return None
+
+    try:
+        client = OpenAI(api_key=api_key)
+
+        response = client.audio.speech.create(
+            model=get_secret_value("OPENAI_TTS_MODEL") or "gpt-4o-mini-tts",
+            voice=get_secret_value("OPENAI_TTS_VOICE") or "alloy",
+            input=text,
+        )
+
+        return response.read()
+
+    except Exception:
+        return None
+
+
+def synthesize_gtts(text: str, lang: str) -> Optional[bytes]:
     text = text or ""
 
     if not text.strip():
@@ -134,22 +160,21 @@ def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
         return None
 
 
-def get_openai_api_key() -> Optional[str]:
+def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
     """
-    Get OpenAI API key from Streamlit secrets or environment variable.
+    Generate MP3 audio bytes.
+
+    Priority:
+    1. OpenAI TTS
+    2. gTTS fallback
     """
 
-    api_key = os.environ.get("OPENAI_API_KEY")
+    audio = synthesize_openai_tts(text, lang)
 
-    try:
-        import streamlit as st
+    if audio:
+        return audio
 
-        api_key = st.secrets.get("OPENAI_API_KEY") or api_key
-
-    except Exception:
-        pass
-
-    return api_key
+    return synthesize_gtts(text, lang)
 
 
 def transcribe_audio(
@@ -157,13 +182,6 @@ def transcribe_audio(
     filename: str,
     preferred_lang: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    Transcribe audio using OpenAI Whisper API.
-
-    yue is passed as zh because Whisper language parameter
-    does not always support Cantonese as a separate code.
-    """
-
     api_key = get_openai_api_key()
 
     if not api_key:
@@ -185,7 +203,7 @@ def transcribe_audio(
             audio_file.name = filename or "audio.wav"
 
             response = client.audio.transcriptions.create(
-                model="whisper-1",
+                model=get_secret_value("OPENAI_STT_MODEL") or "whisper-1",
                 file=audio_file,
                 language=language,
             )

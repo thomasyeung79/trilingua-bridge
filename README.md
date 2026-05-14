@@ -1,93 +1,107 @@
-# 🌏 TriLingua Bridge v2
+# 🌏 TriLingua Bridge
 
-AI Cross-cultural Communication Assistant  
-AI 多语言与跨文化沟通助手
+AI-powered multilingual communication assistant for:
 
-Supports:
-
-- 🇨🇳 Mandarin Chinese
-- 🇭🇰 Cantonese
-- 🇰🇷 Korean
-- 🇺🇸 English
+* 🇨🇳 Mandarin Chinese
+* 🇭🇰 Cantonese
+* 🇰🇷 Korean
+* 🇺🇸 English
 
 Built with:
 
-- Python
-- Streamlit
-- OpenAI API
-- Claude Code
+* Python
+* Streamlit
+* OpenAI API
+* DeepSeek API (fallback)
+* SQLite
 
 ---
 
 # ✨ Features
 
-## 🎯 AI Chat Coach
+## 🌐 AI Translation
 
-Generate natural replies for:
-
-- daily chat
-- dating / crush conversations
-- workplace communication
-- formal situations
-- K-pop fandom style
-- Hong Kong / Cantonese style
-
-Includes:
-
-- 3 natural reply suggestions
-- tone analysis
-- cultural notes
-- recommended best reply
+* Mandarin ↔ Cantonese ↔ Korean ↔ English
+* Tone-aware translation
+* Natural phrasing adaptation
+* Cross-cultural wording support
 
 ---
 
-## 🌐 Translation
+## 🎯 AI Chat Coach
 
-Natural multilingual translation between:
+Generate culturally natural replies for:
 
-- Chinese
-- Cantonese
-- Korean
-- English
+* Friends
+* Dating / Crush
+* Work
+* Formal situations
+* K-pop style chatting
+* Hong Kong local vibe
 
-Supports:
+Features:
 
-- auto language detection
-- natural tone preservation
-- cross-cultural wording adjustment
+* Multiple reply suggestions
+* Tone analysis
+* Naturalness score
+* Cultural explanation
+* Pronunciation support
+
+---
+
+## 🎵 Lyrics / Drama Context Analysis
+
+Understand:
+
+* K-pop lyrics
+* Korean dramas
+* Chinese dramas
+* Hong Kong dramas
+* English TV dialogue
+* Internet slang
+
+Includes:
+
+* Hidden meaning explanation
+* Cultural context
+* Slang interpretation
+* Tone notes
+* Clean translation
 
 ---
 
 ## ✍️ Grammar Correction
 
-- fix grammar mistakes
-- explain corrections
-- learner-friendly feedback
-- beginner / intermediate / advanced support
+* AI grammar correction
+* Learner-level adaptation
+* Example sentences
+* Multi-language support
 
 ---
 
-## 🎯 Natural Expression
+## 🧠 Natural Expression Mode
 
-Improve unnatural sentences into:
+Turn textbook language into native-like expressions.
 
-- native-like expressions
-- softer tone
-- more polite tone
-- more casual tone
-- more natural conversation style
+Supports:
+
+* Casual tone
+* Friendly tone
+* Formal tone
+* Cute tone
+* Social-media style
 
 ---
 
-## 📚 Vocabulary Explanation
+## 📚 Vocabulary Explainer
 
-Explain:
+AI explains:
 
-- slang
-- difficult words
-- internet expressions
-- cultural vocabulary
-- K-pop fandom language
+* Key phrases
+* Slang
+* Pop culture terms
+* Usage examples
+* Cultural nuance
 
 ---
 
@@ -95,180 +109,66 @@ Explain:
 
 Analyze:
 
-- emotion
-- politeness
-- hidden meaning
-- social tone
-- passive-aggressive expressions
-- relationship vibe
+* Politeness
+* Formality
+* Hidden emotion
+* Directness
+* Relationship vibe
 
 ---
 
-## 🎵 Lyrics & Drama Context
-
-Understand:
-
-- K-pop lyrics
-- Korean drama dialogue
-- Chinese drama dialogue
-- Cantonese drama dialogue
-- English TV/movie dialogue
-- internet slang
-- pop culture references
-
-Includes:
-
-- translation
-- key phrase explanation
-- cultural background
-- slang explanation
-- recommended understanding
-
----
-
-## 🔊 Pronunciation Support
+## 🎙️ Voice Features
 
 Supports:
 
-- Mandarin Pinyin
-- Cantonese Jyutping
-- Korean Romanization
-- English IPA
+* Audio upload
+* Speech-to-text (Whisper)
+* Pronunciation guide
+* TTS playback
+
+Languages:
+
+* Chinese
+* Cantonese
+* Korean
+* English
 
 ---
 
-## 🎤 Voice Input (STT)
+## 📷 Screenshot Chat Analysis
 
-Upload audio files:
+Upload screenshots from:
 
-- wav
-- mp3
-- m4a
-- webm
+* HelloTalk
+* KakaoTalk
+* WeChat
+* Instagram
+* WhatsApp
 
-Powered by OpenAI Whisper.
+AI can:
 
----
-
-## 🔈 Text-to-Speech (TTS)
-
-Generate pronunciation audio using:
-
-- OpenAI TTS
-- gTTS fallback
+* Analyze conversation tone
+* Explain hidden meaning
+* Suggest replies
+* Detect flirting / cold tone
+* Give cultural advice
 
 ---
 
-## 🗂️ User-isolated History
+# 🧩 Tech Stack
 
-SQLite-based history system.
-
-Each username has isolated:
-
-- conversations
-- translations
-- AI outputs
-- learning history
-
----
-
-# 🖥️ UI Preview
-
-Main modules:
-
-- Home
-- Say
-- Mean
-- AI Chat Coach
-- Lyrics & Drama Context
-- Translation
-- Grammar
-- Natural Expression
-- Vocabulary
-- Tone Analysis
-- History
+| Layer         | Technology                              |
+| ------------- | --------------------------------------- |
+| Frontend      | Streamlit                               |
+| AI APIs       | OpenAI / DeepSeek                       |
+| Database      | SQLite                                  |
+| Speech        | Whisper / gTTS                          |
+| Pronunciation | pypinyin / hangul-romanize / eng_to_ipa |
+| Deployment    | Streamlit Cloud                         |
 
 ---
 
-# 🚀 Installation
-
-## 1. Clone Project
-
-```bash
-git clone https://github.com/yourname/trilingua-bridge.git
-cd trilingua-bridge
-```
-
----
-
-## 2. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## 3. Configure Environment Variables
-
-Copy:
-
-```text
-.env.example
-```
-
-to:
-
-```text
-.env
-```
-
-Then add your OpenAI API key:
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-Optional proxy settings:
-
-```env
-HTTP_PROXY=http://127.0.0.1:7890
-HTTPS_PROXY=http://127.0.0.1:7890
-```
-
----
-
-## 4. Run the App
-
-```bash
-streamlit run app.py
-```
-
----
-
-# 📦 Requirements
-
-Main dependencies:
-
-```text
-streamlit>=1.33.0
-python-dotenv>=1.0.1
-openai>=1.13.3
-pycantonese>=4.0.0
-tiktoken>=0.6.0
-```
-
-Optional pronunciation libraries:
-
-```text
-pypinyin
-hangul-romanize
-eng-to-ipa
-```
-
----
-
-# 📁 Recommended Project Structure
+# 📂 Project Structure
 
 ```text
 TriLingua-Bridge/
@@ -283,103 +183,137 @@ TriLingua-Bridge/
 ├── README.md
 ├── .env.example
 │
-├── trilingua_bridge.db
-│
-└── .streamlit/
-    └── secrets.toml
+└── assets/
 ```
 
 ---
 
-# 🧠 Tech Stack
+# ⚙️ Installation
 
-Frontend:
+## 1. Clone repository
 
-- Streamlit
+```bash
+git clone https://github.com/yourname/trilingua-bridge.git
 
-Backend:
-
-- Python
-
-AI:
-
-- OpenAI GPT
-- Whisper
-- TTS
-
-Database:
-
-- SQLite
-
-Deployment:
-
-- Streamlit Cloud
+cd trilingua-bridge
+```
 
 ---
 
-# 🌍 Current Supported Languages
+## 2. Install dependencies
 
-| Language | Status |
-|---|---|
-| English | ✅ |
-| Mandarin Chinese | ✅ |
-| Cantonese | ✅ |
-| Korean | ✅ |
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-# 🔮 Planned Features
+## 3. Configure environment variables
 
-## v2.x
+Create `.env`
 
-- better Cantonese support
-- advanced pronunciation UI
-- conversation memory
-- AI relationship analysis
-- multilingual speech mode
-- streaming response
-- export chat history
+```env
+OPENAI_API_KEY=your_openai_api_key
 
-## v3
+DEEPSEEK_API_KEY=your_deepseek_api_key
 
-- mobile-first UI
-- AI language partner mode
-- Apple-style UX redesign
-- real-time voice conversation
-- personalized learning system
+OPENAI_MODEL=gpt-4o-mini
+
+DEEPSEEK_MODEL=deepseek-chat
+```
 
 ---
 
-# ⚠️ Notes
+## 4. Run app
 
-- OpenAI API is required for full AI functionality.
-- Without API keys, the app can still run in mock/fallback mode.
-- OpenAI TTS/STT API response structures may change over time.
-- If compatibility issues occur, please check the latest OpenAI SDK documentation.
-
----
-
-# 👨‍💻 Development Notes
-
-This project originally started as a small personal language-learning helper:
-
-- replying to Korean messages
-- understanding lyrics
-- improving natural expressions
-
-It gradually evolved into a full multilingual AI communication platform.
-
-This version was also one of the first large-scale experiments using Claude Code for AI-assisted software development.
+```bash
+streamlit run app.py
+```
 
 ---
 
-# 📜 License
+# 🔑 API Notes
 
-MIT License
+## OpenAI
+
+Used for:
+
+* GPT chat
+* Whisper STT
+* Vision screenshot analysis
 
 ---
 
-# ❤️ TriLingua Bridge
+## DeepSeek
 
-Language is not only translation.  
-It is culture, tone, emotion, and human connection.
+Used as:
+
+* Automatic fallback provider
+* Lower-cost alternative
+* Mainland China friendly option
+
+---
+
+# 🌏 Language Notes
+
+## zh
+
+* Simplified Chinese
+* Mandarin
+
+## yue
+
+* Traditional Chinese
+* Cantonese wording
+
+## ko
+
+* Korean
+
+## en
+
+* English
+
+---
+
+# 🚀 Future Roadmap
+
+Planned features:
+
+* Real-time microphone mode
+* AI pronunciation scoring
+* Accent training
+* Conversation memory
+* Multi-person chat analysis
+* AI roleplay mode
+* Korean dating culture mode
+* Hong Kong local slang database
+* Streaming AI response
+* Mobile UI optimization
+
+---
+
+# 📌 Disclaimer
+
+This project is intended for:
+
+* Language learning
+* Cross-cultural communication
+* Educational purposes
+
+AI responses may occasionally be inaccurate.
+
+---
+
+# 👨‍💻 Developer
+
+TriLingua Bridge
+Built by an independent developer exploring:
+
+* AI
+* Language learning
+* K-pop culture
+* Cross-cultural communication
+* Human-centered AI products
+
+---

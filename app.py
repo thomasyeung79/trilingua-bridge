@@ -536,6 +536,8 @@ def render_naturalness_panel(title: str, eval_data: Dict[str, Any]):
 # =========================
 
 def render_home_dashboard():
+    st.caption("DEBUG: app render_home_dashboard loaded")
+    
     hero(
         t("app_title"),
         TEXTS.get(st.session_state.ui_lang, {}).get("subtitle_v2", t("subtitle")),

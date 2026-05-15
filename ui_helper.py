@@ -1,3 +1,4 @@
+import html
 import json
 from typing import Dict, Any, List, Tuple
 
@@ -192,101 +193,176 @@ def inject_css():
     st.markdown(
         """
         <style>
+        :root {
+            --bg: #f7f8fa;
+            --panel: #ffffff;
+            --panel-soft: #fbfcfe;
+            --text: #111827;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --line-strong: #d1d5db;
+            --accent: #2563eb;
+            --accent-soft: #eff6ff;
+            --shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+        }
+
         html, body, [data-testid="stAppViewContainer"] {
-            background: #f6f8fb !important;
+            background: var(--bg) !important;
+            color: var(--text);
         }
 
         .block-container {
-            max-width: 980px;
-            padding-top: 3rem;
+            max-width: 1040px;
+            padding-top: 2.25rem;
             padding-bottom: 3rem;
         }
 
-        .output-wrap {
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px 16px;
-            margin: 12px 0;
+        h1, h2, h3, p {
+            letter-spacing: 0;
+        }
+
+        div[data-testid="stButton"] > button {
+            border-radius: 8px;
+            border: 1px solid var(--line-strong);
             background: #ffffff;
-            box-shadow: 0 4px 16px rgba(16, 24, 40, 0.04);
+            color: var(--text);
+            font-weight: 650;
+            min-height: 42px;
+            transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
         }
 
-        .output-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px 16px;
-            margin: 12px 0;
-            background: #ffffff;
-            box-shadow: 0 4px 16px rgba(16, 24, 40, 0.04);
+        div[data-testid="stButton"] > button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 6px 18px rgba(37, 99, 235, 0.12);
+            transform: translateY(-1px);
         }
 
-        .input-wrap {
-            border: 1px dashed #d1d5db;
-            border-radius: 14px;
-            padding: 10px 12px;
-            background: #fafafa;
-            margin-bottom: 10px;
-        }
-
-        .hero-title {
-            font-size: 2rem;
-            font-weight: 800;
-            margin-bottom: 0.2rem;
-        }
-
-        .hero-sub {
-            color: #6b7280;
-            margin-bottom: 0.8rem;
-            font-size: 1.05rem;
+        div[data-testid="stTextInput"] input,
+        div[data-testid="stTextArea"] textarea,
+        div[data-testid="stNumberInput"] input {
+            border-radius: 8px !important;
         }
 
         .hero-box {
-            padding: 20px 18px;
-            border: 1px solid #e5e7eb;
-            border-radius: 18px;
-            background: linear-gradient(135deg, #e7f3ff 0%, #f9f5ff 100%);
-            box-shadow: 0 6px 22px rgba(16, 24, 40, 0.06);
+            padding: 22px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
             margin-bottom: 18px;
         }
 
+        .hero-title {
+            font-size: 2.15rem;
+            line-height: 1.12;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+            color: var(--text);
+        }
+
+        .hero-sub {
+            color: var(--muted);
+            margin-bottom: 0.35rem;
+            font-size: 1.02rem;
+            line-height: 1.55;
+        }
+
+        .settings-card,
+        .output-wrap,
+        .output-card {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 16px;
+            margin: 12px 0;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+        }
+
+        .input-wrap {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 12px;
+            background: var(--panel-soft);
+            margin-bottom: 12px;
+        }
+
+        .settings-title {
+            font-weight: 750;
+            font-size: 1.05rem;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        .settings-sub,
+        .section-sub,
+        .feature-card-sub {
+            color: var(--muted);
+        }
+
+        .section-title {
+            font-weight: 780;
+            font-size: 1.18rem;
+            margin-top: 22px;
+            margin-bottom: 4px;
+            color: var(--text);
+        }
+
+        .section-sub {
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
         .feature-card {
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 14px;
-            text-align: center;
-            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 16px 14px;
+            min-height: 116px;
+            text-align: left;
+            background: var(--panel);
             margin-bottom: 8px;
-            box-shadow: 0 4px 14px rgba(16, 24, 40, 0.035);
-            transition: all 0.15s ease-in-out;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.035);
+            transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
         }
 
         .feature-card:hover {
             transform: translateY(-1px);
-            box-shadow: 0 8px 22px rgba(16, 24, 40, 0.08);
-            border-color: #cbd5e1;
+            box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+            border-color: var(--accent);
+        }
+
+        .feature-card-icon {
+            width: 34px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: var(--accent-soft);
+            margin-bottom: 10px;
+            font-size: 1.15rem;
         }
 
         .feature-card-title {
-            font-weight: 700;
-            margin-top: 4px;
+            font-weight: 750;
+            font-size: 0.98rem;
+            margin-bottom: 4px;
+            color: var(--text);
         }
 
         .feature-card-sub {
-            color: #6b7280;
             font-size: 0.86rem;
-            margin-top: 4px;
+            line-height: 1.42;
         }
 
-        .section-title {
-            font-weight: 750;
-            font-size: 1.2rem;
-            margin-top: 20px;
-            margin-bottom: 4px;
+        [data-testid="stExpander"] {
+            border-radius: 8px;
+            border-color: var(--line);
+            background: var(--panel);
         }
 
-        .section-sub {
-            color: #6b7280;
-            margin-bottom: 12px;
+        .stAlert {
+            border-radius: 8px;
         }
         </style>
         """,
@@ -295,6 +371,9 @@ def inject_css():
 
 
 def section_header(title: str, sub: str = ""):
+    title = html.escape(str(title))
+    sub = html.escape(str(sub))
+
     st.markdown(f'<div class="section-title">{title}</div>', unsafe_allow_html=True)
 
     if sub:
@@ -302,6 +381,9 @@ def section_header(title: str, sub: str = ""):
 
 
 def hero(title: str, sub: str = "", note: str = ""):
+    title = html.escape(str(title))
+    sub = html.escape(str(sub))
+
     st.markdown('<div class="hero-box">', unsafe_allow_html=True)
     st.markdown(f'<div class="hero-title">{title}</div>', unsafe_allow_html=True)
 
@@ -375,15 +457,16 @@ def render_structured_response(obj: Dict[str, Any]):
             st.markdown(f"### {t(text_key)}")
             st.write(obj[data_key])
 
-    if obj.get("suggestions"):
-        st.markdown(f"### {t('suggestions')}")
-        for item in obj["suggestions"]:
-            st.markdown(f"- {item}")
+    list_sections = [
+        ("suggestions", "suggestions"),
+        ("examples", "examples"),
+    ]
 
-    if obj.get("examples"):
-        st.markdown(f"### {t('examples')}")
-        for item in obj["examples"]:
-            st.markdown(f"- {item}")
+    for data_key, text_key in list_sections:
+        if obj.get(data_key):
+            st.markdown(f"### {t(text_key)}")
+            for item in obj[data_key]:
+                st.markdown(f"- {item}")
 
     if obj.get("items"):
         st.markdown(f"### {t('items')}")
@@ -491,11 +574,12 @@ def show_model_caption(usage: Dict[str, Any], latency_ms: int):
     model = usage.get("model", "-")
     prompt_tokens = usage.get("prompt_tokens", "-")
     completion_tokens = usage.get("completion_tokens", "-")
+    latency = latency_ms if latency_ms is not None else "-"
 
     st.caption(
         f"{t('model_info_prefix')}: {model} • "
         f"{t('tokens_label')}: {prompt_tokens}/{completion_tokens} • "
-        f"{t('latency_label')}: {latency_ms} ms"
+        f"{t('latency_label')}: {latency} ms"
     )
 
 
@@ -509,19 +593,23 @@ def normalize_usage(usage: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def feature_card(title: str, sub: str, icon: str = "✨", key: str = "") -> bool:
+def feature_card(title: str, sub: str, icon: str = "", key: str = "") -> bool:
+    safe_title = html.escape(str(title))
+    safe_sub = html.escape(str(sub))
+    safe_icon = html.escape(str(icon))
+
     st.markdown(
         f"""
         <div class="feature-card">
-            <div style="font-size: 1.5rem;">{icon}</div>
-            <div class="feature-card-title">{title}</div>
-            <div class="feature-card-sub">{sub}</div>
+            <div class="feature-card-icon">{safe_icon}</div>
+            <div class="feature-card-title">{safe_title}</div>
+            <div class="feature-card-sub">{safe_sub}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    return st.button(f"{icon} {title}", key=key, use_container_width=True)
+    return st.button(title, key=key, use_container_width=True)
 
 
 TEXTS = {
@@ -541,6 +629,7 @@ TEXTS = {
         "persona": "Persona",
         "creativity": "Creativity",
         "model": "Model",
+        "ai_provider": "AI Provider",
         "show_pron": "Show pronunciation and TTS",
         "tip": "Tip: Keep inputs short and specific for best results.",
         "nav_home": "Home",
@@ -550,6 +639,8 @@ TEXTS = {
         "mode_mean_sub": "Explain hidden meanings and tone",
         "mode_kpop": "Lyrics & Drama Context",
         "mode_kpop_sub": "K-pop lyrics / dramas / internet context",
+        "mode_coach": "AI Chat Coach",
+        "mode_coach_sub": "Culturally tuned replies",
         "feature_translate": "Translate",
         "feature_grammar": "Grammar",
         "feature_grammar_sub": "Correct mistakes with level notes",
@@ -563,6 +654,7 @@ TEXTS = {
         "nav_about": "About",
         "what_can": "What can it do?",
         "what_can_v2": "Your cross-cultural chat assistant",
+        "what_can_sub": "Choose a task and keep your language, tone, and cultural context aligned.",
         "not_social": "This is not a social platform.",
         "back_home": "Back to Home",
         "input_text": "Enter or paste your text",
@@ -616,7 +708,6 @@ TEXTS = {
         "filter_mode": "Mode",
         "filter_source": "Source",
         "filter_target": "Target",
-        "filter_persona": "Persona",
         "search_in": "Search in history",
         "show_last": "Show last N items",
         "history_load_failed": "Failed to load history",
@@ -640,7 +731,7 @@ TEXTS = {
         "region_korean": "Korean mode",
         "region_au_en": "Australian English mode",
         "region_us_en": "American English mode",
-        "screenshot_mode": "📷 Analyze chat screenshot",
+        "screenshot_mode": "Analyze chat screenshot",
         "analyze_screenshot_btn": "Analyze screenshot",
         "upload_screenshot": "Upload a chat screenshot",
         "please_upload_image_first": "Please upload an image first.",
@@ -692,6 +783,7 @@ TEXTS = {
         "persona": "人设",
         "creativity": "创造性",
         "model": "模型",
+        "ai_provider": "AI 模型服务",
         "show_pron": "显示发音与朗读",
         "tip": "提示：输入越具体越好。",
         "nav_home": "首页",
@@ -701,6 +793,8 @@ TEXTS = {
         "mode_mean_sub": "解释潜台词与语气",
         "mode_kpop": "歌词与影视语境",
         "mode_kpop_sub": "K-pop / 影视 / 网络语境解析",
+        "mode_coach": "AI 聊天教练",
+        "mode_coach_sub": "根据文化语境生成回复",
         "feature_translate": "翻译",
         "feature_grammar": "语法",
         "feature_grammar_sub": "按级别纠错并提示",
@@ -714,6 +808,7 @@ TEXTS = {
         "nav_about": "关于",
         "what_can": "能做什么？",
         "what_can_v2": "你的跨文化聊天助手",
+        "what_can_sub": "选择任务，并保持语言、语气和文化语境一致。",
         "not_social": "本应用不是社交平台。",
         "back_home": "返回首页",
         "input_text": "请输入文本",
@@ -767,7 +862,6 @@ TEXTS = {
         "filter_mode": "模式",
         "filter_source": "源语言",
         "filter_target": "目标语言",
-        "filter_persona": "人设",
         "search_in": "历史中搜索",
         "show_last": "显示最近 N 条",
         "history_load_failed": "加载历史失败",
@@ -791,7 +885,7 @@ TEXTS = {
         "region_korean": "韩国语模式",
         "region_au_en": "澳式英语模式",
         "region_us_en": "美式英语模式",
-        "screenshot_mode": "📷 聊天截图分析",
+        "screenshot_mode": "聊天截图分析",
         "analyze_screenshot_btn": "分析截图",
         "upload_screenshot": "上传聊天截图",
         "please_upload_image_first": "请先上传图片。",
@@ -832,7 +926,6 @@ TEXTS = {
 TEXTS["ko"] = {
     **TEXTS["en"],
     **{
-        "app_title": "TriLingua Bridge",
         "subtitle": "중국어, 광둥어, 한국어, 영어를 위한 다국어 소통 도구.",
         "subtitle_v2": "중국어 / 광둥어 / 한국어 / 영어를 위한 다문화 커뮤니케이션 코치.",
         "ui_language": "인터페이스 언어",
@@ -847,139 +940,31 @@ TEXTS["ko"] = {
         "persona": "페르소나",
         "creativity": "창의성",
         "model": "모델",
+        "ai_provider": "AI 제공자",
         "show_pron": "발음과 TTS 표시",
-        "tip": "팁: 입력이 짧고 구체적일수록 결과가 좋습니다.",
-        "nav_home": "홈",
-        "mode_say": "더 자연스럽게 말하기",
-        "mode_say_sub": "문장을 더 자연스럽게 표현",
-        "mode_mean": "무슨 뜻일까?",
-        "mode_mean_sub": "숨은 의미와 말투 설명",
-        "mode_kpop": "가사와 드라마 맥락",
-        "mode_kpop_sub": "K-pop / 드라마 / 인터넷 맥락 설명",
-        "feature_translate": "번역",
-        "feature_grammar": "문법",
-        "feature_grammar_sub": "수준별 문법 교정",
-        "feature_natural": "자연스러운 표현",
-        "feature_natural_sub": "원어민처럼 표현하기",
-        "feature_vocab": "어휘",
-        "feature_vocab_sub": "핵심 단어와 표현 설명",
-        "feature_tone": "말투 분석",
-        "feature_tone_sub": "공손함 / 격식 / 직접성 분석",
-        "nav_history": "기록",
-        "nav_about": "소개",
-        "what_can": "무엇을 할 수 있나요?",
         "what_can_v2": "나만의 다문화 채팅 도우미",
-        "not_social": "이 앱은 소셜 플랫폼이 아닙니다.",
-        "back_home": "홈으로 돌아가기",
-        "input_text": "텍스트 입력",
-        "run": "실행",
-        "enter_text_translate": "번역할 텍스트 입력",
-        "translate_btn": "번역",
-        "source_language": "원문 언어",
-        "language_of_text": "텍스트 언어",
-        "auto_detect": "자동 감지",
-        "working": "처리 중...",
-        "ai_call_failed": "AI 호출 실패",
-        "db_init_failed": "데이터베이스 초기화 실패",
-        "history_save_failed": "기록 저장 실패",
-        "detected_source": "감지된 원문 언어",
-        "pronunciation_label": "발음",
-        "playing_audio": "음성 생성 중...",
-        "tts_not_supported": "이 언어는 TTS를 지원하지 않습니다.",
-        "voice_input": "음성 입력",
-        "upload_audio": "오디오 파일 업로드",
-        "transcribe": "전사",
-        "transcribing": "전사 중...",
-        "ok": "완료",
-        "stt_unavailable": "음성 인식을 사용할 수 없습니다.",
-        "please_upload_audio_first": "먼저 오디오 파일을 업로드하세요.",
-        "live_mic_note": "마이크로 녹음하세요.",
-        "start_recording": "녹음 시작",
-        "stop_recording": "정지",
-        "mic_not_installed": "streamlit-mic-recorder가 설치되지 않았습니다.",
-        "relation_mode": "관계 / 스타일",
-        "ctx_kpop": "K-pop 가사",
-        "ctx_kdrama": "한국 드라마",
-        "ctx_cantodrama": "홍콩 드라마",
-        "ctx_cdrama": "중국 드라마",
-        "ctx_eng_tv": "영어권 영상",
-        "ctx_inet": "인터넷 표현",
-        "ctx_pop": "대중문화",
-        "context_type": "맥락 유형",
-        "enter_text_correct": "교정할 텍스트 입력",
-        "correct_btn": "문법 교정",
-        "learner_level": "학습자 레벨",
-        "enter_text_natural": "초안 입력",
-        "desired_tone": "원하는 말투",
-        "suggest_btn": "제안하기",
-        "enter_text_vocab": "어휘 설명할 텍스트 입력",
-        "max_items": "최대 항목 수",
-        "explain_vocab_btn": "어휘 설명",
-        "enter_text_tone": "말투 분석할 텍스트 입력",
-        "analyze_tone_btn": "말투 분석",
-        "history_title": "기록",
-        "history_sub": "최근 작업",
-        "filter_mode": "모드",
-        "filter_source": "원문",
-        "filter_target": "목표",
-        "filter_persona": "페르소나",
-        "search_in": "기록 검색",
-        "show_last": "최근 N개 표시",
-        "history_load_failed": "기록 불러오기 실패",
-        "no_history": "기록이 없습니다.",
-        "input_label": "입력",
-        "output_label": "출력",
-        "model_info_prefix": "모델",
-        "tokens_label": "토큰",
-        "latency_label": "지연 시간",
-        "about_title": "소개",
-        "about_desc": "TriLingua Bridge v2 — 다문화 커뮤니케이션 코치.",
-        "enter_text_warn": "먼저 텍스트를 입력하세요.",
-        "naturalness_score_title": "자연스러움 점수",
-        "naturalness_verdict": "판단",
-        "naturalness_score": "점수",
-        "naturalness_reason": "이유",
-        "naturalness_suggestion": "더 자연스러운 표현",
-        "region_mode": "지역 / 문화 모드",
-        "region_mainland_cn": "중국 본토 모드",
-        "region_hk_yue": "홍콩 광둥어 모드",
-        "region_korean": "한국어 모드",
-        "region_au_en": "호주 영어 모드",
-        "region_us_en": "미국 영어 모드",
-        "screenshot_mode": "📷 채팅 스크린샷 분석",
-        "analyze_screenshot_btn": "스크린샷 분석",
-        "upload_screenshot": "채팅 스크린샷 업로드",
-        "please_upload_image_first": "먼저 이미지를 업로드하세요.",
-        "screenshot_not_available": "스크린샷 분석을 사용할 수 없습니다.",
+        "what_can_sub": "작업을 선택하고 언어, 말투, 문화적 맥락을 맞춰 보세요.",
+        "mode_coach": "AI 채팅 코치",
+        "mode_coach_sub": "문화 맥락에 맞춘 답장",
         "mode_coach_v2": "AI 채팅 코치",
         "mode_coach_sub_v2": "중국 / 홍콩 / 한국 / 호주 / 미국 문화에 맞춘 답장",
-        "style_friend": "친구",
-        "style_crush": "썸 / 호감 상대",
-        "style_work": "직장 / 업무",
-        "style_formal": "격식",
-        "style_cute": "귀여움",
-        "style_cold": "조금 차갑게",
-        "style_kpop": "K-pop 느낌",
-        "style_hk": "홍콩 로컬 느낌",
+        "feature_translate": "번역",
+        "feature_grammar": "문법",
+        "feature_natural": "자연스러운 표현",
+        "feature_vocab": "어휘",
+        "feature_tone": "말투 분석",
+        "nav_history": "기록",
+        "nav_about": "소개",
+        "run": "실행",
+        "translate_btn": "번역",
+        "filter_target": "목표",
         "reply_options": "답장 추천",
         "tone_notes": "말투 설명",
         "cultural_notes": "문화 설명",
         "suggested_best_reply": "추천 답장",
         "why_this_works": "이 답장이 자연스러운 이유",
         "pronunciation": "발음",
-        "examples": "예문",
-        "corrected_version": "수정된 문장",
-        "notes": "설명",
-        "clean_translation": "자연스러운 번역",
         "summary": "요약",
-        "recommended_understanding": "추천 이해",
-        "tone_summary": "말투 요약",
-        "intent": "의도",
-        "tips": "팁",
-        "better_version": "더 자연스러운 표현",
-        "items": "어휘 항목",
-        "key_phrases": "핵심 표현",
-        "slang_pop_culture": "속어 / 대중문화",
         "suggestions": "제안",
     },
 }
@@ -998,142 +983,32 @@ TEXTS["yue"] = {
         "prefs_title": "偏好設定",
         "my_native": "我嘅母語",
         "i_learn": "我想學",
-        "persona": "人設",
         "creativity": "創意度",
-        "model": "模型",
+        "ai_provider": "AI 模型服務",
         "show_pron": "顯示發音同朗讀",
-        "tip": "提示：輸入越具體越好。",
-        "nav_home": "首頁",
-        "mode_say": "講得自然啲",
-        "mode_say_sub": "令你句嘢聽落更自然",
-        "mode_mean": "佢想表達咩？",
-        "mode_mean_sub": "解釋潛台詞同語氣",
-        "mode_kpop": "歌詞同影視語境",
-        "mode_kpop_sub": "K-pop / 影視 / 網絡語境解析",
-        "feature_translate": "翻譯",
-        "feature_grammar": "文法",
-        "feature_grammar_sub": "按程度改錯同提示",
-        "feature_natural": "自然表達",
-        "feature_natural_sub": "講到似母語者",
-        "feature_vocab": "詞彙",
-        "feature_vocab_sub": "解釋重點詞組",
-        "feature_tone": "語氣分析",
-        "feature_tone_sub": "禮貌 / 正式 / 直接程度",
-        "nav_history": "歷史",
-        "nav_about": "關於",
-        "what_can": "可以做啲咩？",
         "what_can_v2": "你嘅跨文化聊天助手",
-        "not_social": "呢個應用唔係社交平台。",
-        "back_home": "返首頁",
-        "input_text": "請輸入文字",
-        "run": "運行",
-        "enter_text_translate": "輸入要翻譯嘅文字",
-        "translate_btn": "翻譯",
-        "source_language": "源語言",
-        "language_of_text": "文本語言",
-        "auto_detect": "自動偵測",
-        "working": "處理中...",
-        "ai_call_failed": "AI 調用失敗",
-        "db_init_failed": "資料庫初始化失敗",
-        "history_save_failed": "保存歷史失敗",
-        "detected_source": "偵測到嘅源語言",
-        "pronunciation_label": "發音",
-        "playing_audio": "生成語音中...",
-        "tts_not_supported": "目前語言暫時唔支援 TTS。",
-        "voice_input": "語音輸入",
-        "upload_audio": "上載音頻文件",
-        "transcribe": "轉寫",
-        "transcribing": "轉寫中...",
-        "ok": "完成",
-        "stt_unavailable": "語音識別暫時不可用。",
-        "please_upload_audio_first": "請先上載音頻文件。",
-        "live_mic_note": "用咪高峰錄音。",
-        "start_recording": "開始錄音",
-        "stop_recording": "停止",
-        "mic_not_installed": "未安裝 streamlit-mic-recorder，暫時用唔到咪高峰錄音。",
-        "relation_mode": "關係 / 風格",
-        "ctx_kpop": "K-pop 歌詞",
-        "ctx_kdrama": "韓劇對白",
-        "ctx_cantodrama": "港劇對白",
-        "ctx_cdrama": "國劇對白",
-        "ctx_eng_tv": "英文影視",
-        "ctx_inet": "網絡用語",
-        "ctx_pop": "流行文化",
-        "context_type": "語境類型",
-        "enter_text_correct": "輸入要修正嘅文字",
-        "correct_btn": "文法修正",
-        "learner_level": "學習者程度",
-        "enter_text_natural": "輸入你嘅草稿",
-        "desired_tone": "想要嘅語氣",
-        "suggest_btn": "畀個更自然講法",
-        "enter_text_vocab": "輸入文字以解釋詞彙",
-        "max_items": "最多項目",
-        "explain_vocab_btn": "解釋詞彙",
-        "enter_text_tone": "輸入文字以分析語氣",
-        "analyze_tone_btn": "分析語氣",
-        "history_title": "歷史記錄",
-        "history_sub": "最近任務",
-        "filter_mode": "模式",
-        "filter_source": "源語言",
-        "filter_target": "目標語言",
-        "filter_persona": "人設",
-        "search_in": "搜尋歷史",
-        "show_last": "顯示最近 N 條",
-        "history_load_failed": "載入歷史失敗",
-        "no_history": "暫時未有歷史。",
-        "input_label": "輸入",
-        "output_label": "輸出",
-        "model_info_prefix": "模型",
-        "tokens_label": "Tokens",
-        "latency_label": "延遲",
-        "about_title": "關於",
-        "about_desc": "TriLingua Bridge v2 — 跨文化溝通教練。",
-        "enter_text_warn": "請先輸入文字。",
-        "naturalness_score_title": "自然度評分",
-        "naturalness_verdict": "判斷",
-        "naturalness_score": "分數",
-        "naturalness_reason": "原因",
-        "naturalness_suggestion": "更自然版本",
-        "region_mode": "地區 / 文化模式",
-        "region_mainland_cn": "大陸普通話模式",
-        "region_hk_yue": "香港粵語模式",
-        "region_korean": "韓國語模式",
-        "region_au_en": "澳式英文模式",
-        "region_us_en": "美式英文模式",
-        "screenshot_mode": "📷 聊天截圖分析",
-        "analyze_screenshot_btn": "分析截圖",
-        "upload_screenshot": "上載聊天截圖",
-        "please_upload_image_first": "請先上載圖片。",
-        "screenshot_not_available": "截圖分析暫時不可用。",
+        "what_can_sub": "揀一個任務，保持語言、語氣同文化語境一致。",
+        "mode_coach": "AI 聊天教練",
+        "mode_coach_sub": "按文化語境生成回覆",
         "mode_coach_v2": "AI 聊天教練",
         "mode_coach_sub_v2": "針對大陸 / 香港 / 韓國 / 澳洲 / 美國文化風格調整",
-        "style_friend": "朋友",
-        "style_crush": "曖昧對象",
-        "style_work": "同事 / 工作",
-        "style_formal": "正式",
-        "style_cute": "可愛",
-        "style_cold": "冷淡少少",
-        "style_kpop": "K-pop 氛圍",
-        "style_hk": "香港本地味",
+        "feature_translate": "翻譯",
+        "feature_grammar": "文法",
+        "feature_natural": "自然表達",
+        "feature_vocab": "詞彙",
+        "feature_tone": "語氣分析",
+        "nav_history": "歷史",
+        "nav_about": "關於",
+        "run": "運行",
+        "translate_btn": "翻譯",
+        "filter_target": "目標語言",
         "reply_options": "回覆建議",
         "tone_notes": "語氣說明",
         "cultural_notes": "文化說明",
         "suggested_best_reply": "推薦回覆",
         "why_this_works": "點解咁回",
         "pronunciation": "發音",
-        "examples": "例子",
-        "corrected_version": "修正後版本",
-        "notes": "說明",
-        "clean_translation": "自然翻譯",
         "summary": "總結",
-        "recommended_understanding": "推薦理解",
-        "tone_summary": "語氣總結",
-        "intent": "意圖",
-        "tips": "建議",
-        "better_version": "更自然版本",
-        "items": "詞彙項目",
-        "key_phrases": "重點短語",
-        "slang_pop_culture": "俚語 / 流行文化",
         "suggestions": "建議",
     },
 }

@@ -38,13 +38,36 @@ def get_openai_api_key() -> Optional[str]:
     return get_secret_value("OPENAI_API_KEY")
 
 
+def normalize_lang(lang: Optional[str]) -> str:
+    value = (lang or "").lower().strip()
+
+    aliases = {
+        "zh-cn": "zh",
+        "zh_hans": "zh",
+        "zh-hans": "zh",
+        "mandarin": "zh",
+        "cn": "zh",
+        "cantonese": "yue",
+        "zh-hk": "yue",
+        "zh_hant": "yue",
+        "zh-hant": "yue",
+        "ko-kr": "ko",
+        "kr": "ko",
+        "en-us": "en",
+        "en-au": "en",
+        "en-gb": "en",
+    }
+
+    return aliases.get(value, value)
+
+
 def to_pronunciation(text: str, lang: str) -> str:
     text = text or ""
 
     if not text.strip():
         return ""
 
-    lang = (lang or "").lower()
+    lang = normalize_lang(lang)
 
     try:
         if lang == "zh":
@@ -105,13 +128,9 @@ def to_pronunciation(text: str, lang: str) -> str:
 
 def synthesize_openai_tts(text: str, lang: str) -> Optional[bytes]:
     api_key = get_openai_api_key()
-
-    if not api_key:
-        return None
-
     text = text or ""
 
-    if not text.strip():
+    if not api_key or not text.strip():
         return None
 
     try:
@@ -135,14 +154,15 @@ def synthesize_gtts(text: str, lang: str) -> Optional[bytes]:
     if not text.strip():
         return None
 
+    lang = normalize_lang(lang)
+
     lang_map = {
         "zh": "zh-CN",
-        "yue": "zh-CN",
         "en": "en",
         "ko": "ko",
     }
 
-    tts_lang = lang_map.get((lang or "").lower())
+    tts_lang = lang_map.get(lang)
 
     if not tts_lang:
         return None
@@ -166,13 +186,21 @@ def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
 
     Priority:
     1. OpenAI TTS
-    2. gTTS fallback
+    2. gTTS fallback for zh/en/ko
+
+    Note:
+    Cantonese (yue) intentionally does not fallback to gTTS zh-CN,
+    because that would read Cantonese text with Mandarin pronunciation.
     """
 
+    lang = normalize_lang(lang)
     audio = synthesize_openai_tts(text, lang)
 
     if audio:
         return audio
+
+    if lang == "yue":
+        return None
 
     return synthesize_gtts(text, lang)
 
@@ -184,10 +212,10 @@ def transcribe_audio(
 ) -> Optional[str]:
     api_key = get_openai_api_key()
 
-    if not api_key:
+    if not api_key or not file_bytes:
         return None
 
-    client = OpenAI(api_key=api_key)
+    preferred_lang = normalize_lang(preferred_lang)
 
     whisper_lang_map = {
         "zh": "zh",
@@ -196,9 +224,11 @@ def transcribe_audio(
         "ko": "ko",
     }
 
-    language = whisper_lang_map.get((preferred_lang or "").lower())
+    language = whisper_lang_map.get(preferred_lang)
 
     try:
+        client = OpenAI(api_key=api_key)
+
         with io.BytesIO(file_bytes) as audio_file:
             audio_file.name = filename or "audio.wav"
 

@@ -252,6 +252,42 @@ def inject_css():
             box-shadow: var(--shadow);
             margin-bottom: 18px;
         }
+        
+        .hero-kicker {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .hero-logo {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 42px;
+            border-radius: 8px;
+            background: #111827;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 850;
+            font-size: 1.05rem;
+            box-shadow: 0 8px 20px rgba(17, 24, 39, 0.18);
+        }
+
+        .hero-kicker-text {
+            color: var(--text);
+            font-size: 0.92rem;
+            font-weight: 750;
+            line-height: 1.25;
+        }
+
+        .hero-kicker-sub {
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.35;
+            margin-top: 2px;
+        }
 
         .hero-title {
             font-size: 2.15rem;
@@ -355,6 +391,61 @@ def inject_css():
             line-height: 1.42;
         }
 
+        .result-title {
+            font-size: 1.05rem;
+            font-weight: 760;
+            margin: 4px 0 12px;
+            color: var(--text);
+        }
+
+        .result-section-title {
+            font-size: 1rem;
+            font-weight: 760;
+            margin: 22px 0 8px;
+            color: var(--text);
+        }
+
+        .reply-card {
+            display: flex;
+            gap: 12px;
+            border: 1px solid var(--line);
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 14px;
+            margin: 10px 0;
+        }
+
+        .reply-index {
+            width: 28px;
+            height: 28px;
+            flex: 0 0 28px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 750;
+            font-size: 0.9rem;
+        }
+
+        .reply-body {
+            min-width: 0;
+        }
+
+        .reply-text {
+            font-size: 1rem;
+            line-height: 1.55;
+            font-weight: 650;
+            color: var(--text);
+        }
+
+        .reply-meta {
+            margin-top: 6px;
+            font-size: 0.86rem;
+            color: var(--muted);
+        }
+
         [data-testid="stExpander"] {
             border-radius: 8px;
             border-color: var(--line);
@@ -383,17 +474,31 @@ def section_header(title: str, sub: str = ""):
 def hero(title: str, sub: str = "", note: str = ""):
     title = html.escape(str(title))
     sub = html.escape(str(sub))
+    note = html.escape(str(note))
 
-    st.markdown('<div class="hero-box">', unsafe_allow_html=True)
-    st.markdown(f'<div class="hero-title">{title}</div>', unsafe_allow_html=True)
-
-    if sub:
-        st.markdown(f'<div class="hero-sub">{sub}</div>', unsafe_allow_html=True)
-
+    note_html = ""
     if note:
-        st.caption(note)
+        note_html = f'<div class="hero-kicker-sub">{note}</div>'
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    sub_html = ""
+    if sub:
+        sub_html = f'<div class="hero-sub">{sub}</div>'
+
+    html_block = (
+        '<div class="hero-box">'
+        '<div class="hero-kicker">'
+        '<div class="hero-logo">TL</div>'
+        '<div>'
+        '<div class="hero-kicker-text">Mandarin · Cantonese · Korean · English</div>'
+        f'{note_html}'
+        '</div>'
+        '</div>'
+        f'<div class="hero-title">{title}</div>'
+        f'{sub_html}'
+        '</div>'
+    )
+
+    st.markdown(html_block, unsafe_allow_html=True)
 
 
 def looks_like_json(value: str) -> bool:
@@ -413,28 +518,46 @@ def render_structured_response(obj: Dict[str, Any]):
     st.markdown('<div class="output-card">', unsafe_allow_html=True)
 
     if "reply_options" in obj:
-        st.markdown(f"### {t('reply_options')}")
+        st.markdown(f'<div class="result-title">{t("reply_options")}</div>', unsafe_allow_html=True)
 
         for index, option in enumerate(obj.get("reply_options", []), 1):
             if isinstance(option, dict):
-                text = option.get("text", "")
+                text = html.escape(str(option.get("text", "")))
                 score = option.get("naturalness_score", "")
-                tone = option.get("tone", "")
-
-                st.markdown(f"**{index}. {text}**")
+                tone = html.escape(str(option.get("tone", "")))
 
                 meta = []
-
                 if score not in ("", None):
-                    meta.append(f"{t('naturalness_score')}: {score}")
-
+                    meta.append(f'{t("naturalness_score")}: {score}')
                 if tone:
-                    meta.append(f"{t('feature_tone')}: {tone}")
+                    meta.append(f'{t("feature_tone")}: {tone}')
 
-                if meta:
-                    st.caption(" • ".join(meta))
+                meta_text = " · ".join(meta)
+
+                st.markdown(
+                    f"""
+                    <div class="reply-card">
+                        <div class="reply-index">{index}</div>
+                        <div class="reply-body">
+                            <div class="reply-text">{text}</div>
+                            <div class="reply-meta">{html.escape(meta_text)}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
             else:
-                st.markdown(f"**{index}. {option}**")
+                st.markdown(
+                    f"""
+                    <div class="reply-card">
+                        <div class="reply-index">{index}</div>
+                        <div class="reply-body">
+                            <div class="reply-text">{html.escape(str(option))}</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
     section_map = [
         ("tone_notes", "tone_notes"),
@@ -464,7 +587,11 @@ def render_structured_response(obj: Dict[str, Any]):
 
     for data_key, text_key in list_sections:
         if obj.get(data_key):
-            st.markdown(f"### {t(text_key)}")
+            st.markdown(
+                f'<div class="result-section-title">{html.escape(t(text_key))}</div>',
+                unsafe_allow_html=True,
+            )
+
             for item in obj[data_key]:
                 st.markdown(f"- {item}")
 

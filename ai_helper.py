@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -27,6 +27,15 @@ def get_secret_value(key: str) -> Optional[str]:
         pass
 
     return value
+
+
+def get_ai_provider() -> str:
+    provider = (get_secret_value("AI_PROVIDER") or "auto").lower().strip()
+
+    if provider not in ("auto", "openai", "deepseek"):
+        return "auto"
+
+    return provider
 
 
 def get_openai_client() -> Optional[OpenAI]:
@@ -58,9 +67,10 @@ def get_openai_model(model: Optional[str] = None) -> str:
     )
 
 
-def get_deepseek_model() -> str:
+def get_deepseek_model(model: Optional[str] = None) -> str:
     return (
-        get_secret_value("DEEPSEEK_MODEL")
+        model
+        or get_secret_value("DEEPSEEK_MODEL")
         or "deepseek-chat"
     )
 
@@ -98,13 +108,13 @@ def usage_from_response(response, provider: str) -> Dict[str, Any]:
     }
 
 
-def mock_usage(model: Optional[str] = None) -> Dict[str, Any]:
+def mock_usage(model: Optional[str] = None, provider: str = "mock") -> Dict[str, Any]:
     return {
-        "model": model or "mock",
+        "model": model or provider,
         "prompt_tokens": None,
         "completion_tokens": None,
         "total_tokens": None,
-        "provider": "mock",
+        "provider": provider,
     }
 
 
@@ -121,19 +131,33 @@ Output rules:
 - If target_lang is yue, output Traditional Chinese with Cantonese wording when appropriate.
 - If target_lang is ko, output Korean.
 - If target_lang is en, output English.
+- Do not output Korean unless target_lang or output_lang is ko.
 - Do not output English unless target_lang or output_lang is en.
+- Do not mix languages unless the user explicitly asks for bilingual output.
+"""
+
+
+def strict_language_guard() -> str:
+    return """
+Strict language compliance:
+- Obey target_lang, output_lang, and native_lang exactly.
+- For translation, the translated text must be in target_lang only.
+- For explanations, explanations must be in native_lang only.
+- Never switch to Korean just because the app supports Korean.
+- Never infer a different target language from previous tasks.
+- The current request's target_lang is the only target language that matters.
 """
 
 
 def get_output_rule(lang: str) -> str:
     rules = {
-        "zh": "Use Simplified Chinese only. Do not output English.",
-        "yue": "Use Traditional Chinese / Cantonese-style wording. Do not output English.",
-        "ko": "Use Korean only. Do not output English.",
-        "en": "Use English only.",
+        "zh": "Use Simplified Chinese only. Do not output English or Korean.",
+        "yue": "Use Traditional Chinese / Cantonese-style wording only. Do not output English or Korean.",
+        "ko": "Use Korean only. Do not output Chinese or English unless quoting source text.",
+        "en": "Use English only. Do not output Chinese or Korean unless quoting source text.",
     }
 
-    return rules.get(lang, "Use the requested output language.")
+    return rules.get(lang, "Use the requested output language only.")
 
 
 def persona_instructions(persona_profile: Dict[str, Any]) -> str:
@@ -160,91 +184,167 @@ Regional / cultural guidelines:
 # Provider Calls
 # =========================
 
+def _call_openai_json(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+    client = get_openai_client()
+
+    if not client:
+        raise RuntimeError("OpenAI API key is missing.")
+
+    response = client.chat.completions.create(
+        model=get_openai_model(model),
+        temperature=temperature,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    data = safe_json_loads(content)
+
+    return data, usage_from_response(response, "openai"), content
+
+
+def _call_deepseek_json(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+    client = get_deepseek_client()
+
+    if not client:
+        raise RuntimeError("DeepSeek API key is missing.")
+
+    response = client.chat.completions.create(
+        model=get_deepseek_model(),
+        temperature=temperature,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    data = safe_json_loads(content)
+
+    return data, usage_from_response(response, "deepseek"), content
+
+
+def _call_openai_plain(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+) -> Tuple[str, Dict[str, Any]]:
+    client = get_openai_client()
+
+    if not client:
+        raise RuntimeError("OpenAI API key is missing.")
+
+    response = client.chat.completions.create(
+        model=get_openai_model(model),
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    return content, usage_from_response(response, "openai")
+
+
+def _call_deepseek_plain(
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    temperature: float,
+) -> Tuple[str, Dict[str, Any]]:
+    client = get_deepseek_client()
+
+    if not client:
+        raise RuntimeError("DeepSeek API key is missing.")
+
+    response = client.chat.completions.create(
+        model=get_deepseek_model(),
+        temperature=temperature,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+
+    content = response.choices[0].message.content or ""
+    return content, usage_from_response(response, "deepseek")
+
+
 def call_json_chat(
     model: str,
     system_prompt: str,
     user_prompt: str,
     temperature: float = 0.4,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
-
     system_prompt = (
         system_prompt
         + "\nReturn valid JSON only. Do not include markdown."
+        + "\n"
+        + strict_language_guard()
     )
 
-    openai_error = ""
+    provider = get_ai_provider()
 
-    openai_client = get_openai_client()
-
-    if openai_client:
+    if provider == "openai":
         try:
-            response = openai_client.chat.completions.create(
-                model=get_openai_model(model),
-                temperature=temperature,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-
-            content = response.choices[0].message.content or ""
-            data = safe_json_loads(content)
-
-            return data, usage_from_response(response, "openai"), content
-
+            return _call_openai_json(model, system_prompt, user_prompt, temperature)
         except Exception as e:
-            openai_error = str(e)
-
-    else:
-        openai_error = "OpenAI API key is missing."
-
-    deepseek_client = get_deepseek_client()
-
-    if deepseek_client:
-        try:
-            response = deepseek_client.chat.completions.create(
-                model=get_deepseek_model(),
-                temperature=temperature,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-
-            content = response.choices[0].message.content or ""
-            data = safe_json_loads(content)
-
-            return data, usage_from_response(response, "deepseek"), content
-
-        except Exception as e:
-            deepseek_error = str(e)
-
             return (
-                {
-                    "mock": True,
-                    "message": (
-                        "Both OpenAI and DeepSeek failed.\n\n"
-                        f"OpenAI Error: {openai_error}\n"
-                        f"DeepSeek Error: {deepseek_error}"
-                    ),
-                },
-                mock_usage(model),
+                {"mock": True, "message": f"OpenAI failed: {e}"},
+                mock_usage(model, "openai"),
                 "",
             )
 
-    return (
-        {
-            "mock": True,
-            "message": (
-                "No available AI provider. "
-                "Please set OPENAI_API_KEY or DEEPSEEK_API_KEY."
-            ),
-        },
-        mock_usage(model),
-        "",
-    )
+    if provider == "deepseek":
+        try:
+            return _call_deepseek_json(model, system_prompt, user_prompt, temperature)
+        except Exception as e:
+            return (
+                {"mock": True, "message": f"DeepSeek failed: {e}"},
+                mock_usage(model, "deepseek"),
+                "",
+            )
+
+    openai_error = ""
+
+    try:
+        return _call_openai_json(model, system_prompt, user_prompt, temperature)
+    except Exception as e:
+        openai_error = str(e)
+
+    try:
+        return _call_deepseek_json(model, system_prompt, user_prompt, temperature)
+    except Exception as e:
+        deepseek_error = str(e)
+
+        return (
+            {
+                "mock": True,
+                "message": (
+                    "Both OpenAI and DeepSeek failed.\n\n"
+                    f"OpenAI Error: {openai_error}\n"
+                    f"DeepSeek Error: {deepseek_error}"
+                ),
+            },
+            mock_usage(model),
+            "",
+        )
 
 
 def call_plain_chat(
@@ -253,57 +353,35 @@ def call_plain_chat(
     user_prompt: str,
     temperature: float = 0.4,
 ) -> Tuple[str, Dict[str, Any]]:
+    system_prompt = system_prompt + "\n" + strict_language_guard()
+    provider = get_ai_provider()
+
+    if provider == "openai":
+        try:
+            return _call_openai_plain(model, system_prompt, user_prompt, temperature)
+        except Exception as e:
+            return f"OpenAI failed: {e}", mock_usage(model, "openai")
+
+    if provider == "deepseek":
+        try:
+            return _call_deepseek_plain(model, system_prompt, user_prompt, temperature)
+        except Exception as e:
+            return f"DeepSeek failed: {e}", mock_usage(model, "deepseek")
 
     openai_error = ""
 
-    openai_client = get_openai_client()
+    try:
+        return _call_openai_plain(model, system_prompt, user_prompt, temperature)
+    except Exception as e:
+        openai_error = str(e)
 
-    if openai_client:
-        try:
-            response = openai_client.chat.completions.create(
-                model=get_openai_model(model),
-                temperature=temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-
-            content = response.choices[0].message.content or ""
-            return content, usage_from_response(response, "openai")
-
-        except Exception as e:
-            openai_error = str(e)
-
-    else:
-        openai_error = "OpenAI API key is missing."
-
-    deepseek_client = get_deepseek_client()
-
-    if deepseek_client:
-        try:
-            response = deepseek_client.chat.completions.create(
-                model=get_deepseek_model(),
-                temperature=temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-
-            content = response.choices[0].message.content or ""
-            return content, usage_from_response(response, "deepseek")
-
-        except Exception as e:
-            return (
-                f"Both OpenAI and DeepSeek failed.\nOpenAI: {openai_error}\nDeepSeek: {e}",
-                mock_usage(model),
-            )
-
-    return (
-        "No available AI provider. Please set OPENAI_API_KEY or DEEPSEEK_API_KEY.",
-        mock_usage(model),
-    )
+    try:
+        return _call_deepseek_plain(model, system_prompt, user_prompt, temperature)
+    except Exception as e:
+        return (
+            f"Both OpenAI and DeepSeek failed.\nOpenAI: {openai_error}\nDeepSeek: {e}",
+            mock_usage(model),
+        )
 
 
 # =========================
@@ -316,10 +394,10 @@ def detect_language_simple(
     temperature: float,
     persona_profile: Dict[str, Any],
 ) -> Optional[str]:
-
     system_prompt = (
         "You are a strict language detector. "
-        "Return JSON only: {\"lang\":\"zh|yue|ko|en\"}."
+        "Return JSON only: {\"lang\":\"zh|yue|ko|en\"}.\n"
+        "Do not translate the text."
     )
 
     prompt = {
@@ -357,7 +435,6 @@ def translate_text(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[str, Dict[str, Any], Optional[str]]:
-
     detected = None
 
     if source_lang == "auto":
@@ -368,20 +445,26 @@ def translate_text(
             persona_profile=persona_profile,
         )
 
+    effective_source = detected or source_lang
+
     system_prompt = (
         "You are a helpful cross-cultural translator. "
         "Translate naturally and preserve tone, intent, and cultural meaning.\n"
         f"{language_rules()}\n"
+        f"{strict_language_guard()}\n"
+        f"Target language for this request: {target_lang}\n"
+        f"Mandatory output rule: {get_output_rule(target_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
     prompt = {
         "task": "translate",
-        "source_lang": detected or source_lang,
+        "source_lang": effective_source,
         "target_lang": target_lang,
         "native_lang": native_lang,
         "text": text,
         "important_output_rule": get_output_rule(target_lang),
+        "do_not_use_other_target_languages": True,
         "return_schema": {
             "detected_lang": "string or null",
             "translation": "string",
@@ -402,6 +485,68 @@ def translate_text(
 
 
 # =========================
+# Meaning Analysis
+# =========================
+
+def explain_message_meaning(
+    text: str,
+    source_lang: Lang,
+    native_lang: Lang,
+    temperature: float,
+    model: str,
+    persona_profile: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+    detected = None
+
+    if source_lang == "auto":
+        detected = detect_language_simple(
+            text=text,
+            model=model,
+            temperature=temperature,
+            persona_profile=persona_profile,
+        )
+
+    system_prompt = (
+        "You are a cross-cultural meaning and tone analyst.\n"
+        "Do not only translate. Explain tone, hidden meaning, intent, and possible subtext.\n"
+        f"{language_rules()}\n"
+        f"{strict_language_guard()}\n"
+        f"All explanations must be in native_lang: {native_lang}.\n"
+        f"{get_output_rule(native_lang)}\n"
+        f"{persona_instructions(persona_profile)}"
+    )
+
+    prompt = {
+        "task": "meaning_analysis",
+        "source_lang": detected or source_lang,
+        "native_lang": native_lang,
+        "text": text,
+        "important_output_rule": get_output_rule(native_lang),
+        "return_schema": {
+            "detected_lang": "string or null",
+            "clean_translation": "string",
+            "tone_summary": "string",
+            "intent": "string",
+            "hidden_meaning": "string",
+            "cultural_notes": "string",
+            "tips": "string",
+        },
+    }
+
+    data, usage, raw = call_json_chat(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=json.dumps(prompt, ensure_ascii=False),
+        temperature=temperature,
+    )
+
+    if not data:
+        data = {"summary": raw}
+
+    return data, usage, data.get("detected_lang") or detected
+
+
+# =========================
 # Grammar
 # =========================
 
@@ -414,11 +559,12 @@ def correct_grammar(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-
     system_prompt = (
         "You are a grammar coach for multilingual learners.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Corrected text must be in target_lang: {target_lang}.\n"
+        f"Explanations must be in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -461,12 +607,13 @@ def suggest_natural_expression(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-
     system_prompt = (
         "You are a natural expression coach. "
         "Improve the user's sentence so it sounds natural.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Better version must be in target_lang: {target_lang}.\n"
+        f"Explanations must be in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -511,11 +658,11 @@ def explain_vocabulary(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-
     system_prompt = (
         "You are a vocabulary and phrase explainer.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -561,11 +708,11 @@ def analyze_tone(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-
     system_prompt = (
         "You are a tone and intent analyzer.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -607,11 +754,11 @@ def chat_reply_assistant(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[str, Dict[str, Any], Optional[str]]:
-
     system_prompt = (
         "You are a helpful chat reply assistant.\n"
         f"{language_rules()}\n"
-        f"Reply in {target_lang}. {get_output_rule(target_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Reply must be in target_lang: {target_lang}. {get_output_rule(target_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -659,7 +806,6 @@ def chat_reply_coach_advanced(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
-
     detected = None
 
     if source_lang == "auto":
@@ -668,9 +814,10 @@ def chat_reply_coach_advanced(
     system_prompt = (
         "You are an advanced AI cross-cultural chat coach.\n"
         "Provide exactly 3 practical reply options.\n"
-        "Reply options must be in target_lang.\n"
-        "Explanations must be in native_lang.\n"
+        f"Reply options must be in target_lang: {target_lang}.\n"
+        f"Explanations must be in native_lang: {native_lang}.\n"
         f"{language_rules()}\n"
+        f"{strict_language_guard()}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -684,6 +831,7 @@ def chat_reply_coach_advanced(
         "important_output_rule": (
             f"Reply options must be in {target_lang}. "
             f"Tone notes, cultural notes and reason must be in {native_lang}. "
+            "Do not use Korean unless target_lang or native_lang is ko. "
             "Do not use English unless target_lang or native_lang is en."
         ),
         "return_schema": {
@@ -735,7 +883,7 @@ def chat_reply_coach_advanced(
             "tone_notes": "Mock tone notes.",
             "cultural_notes": "Mock cultural notes.",
             "suggested_best_reply": "Mock reply option 1",
-            "reason": "No available AI provider.",
+            "reason": data.get("message", "No available AI provider."),
         }
 
         return data, usage, detected
@@ -762,7 +910,6 @@ def media_context_explain(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
-
     detected = None
 
     if source_lang == "auto":
@@ -772,7 +919,8 @@ def media_context_explain(
         "You are a media and pop-culture context explainer.\n"
         "You explain lyrics, drama dialogue, internet slang and cultural context.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -838,7 +986,6 @@ def analyze_screenshot_chat(
     model: str,
     persona_profile: Dict[str, Any],
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
-
     openai_client = get_openai_client()
 
     if not openai_client:
@@ -849,7 +996,7 @@ def analyze_screenshot_chat(
                 "cultural_notes": "Please set OPENAI_API_KEY.",
                 "reply_options": [],
             },
-            mock_usage(model),
+            mock_usage(model, "openai"),
             assumed_lang,
         )
 
@@ -865,7 +1012,8 @@ def analyze_screenshot_chat(
     system_prompt = (
         "You are an AI chat screenshot analyst and cross-cultural communication coach.\n"
         f"{language_rules()}\n"
-        f"Explain in {native_lang}. {get_output_rule(native_lang)}\n"
+        f"{strict_language_guard()}\n"
+        f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         "Analyze the screenshot carefully. Do not invent text that is not visible.\n"
         f"{persona_instructions(persona_profile)}\n"
         "Return valid JSON only. Do not include markdown."
@@ -940,6 +1088,6 @@ def analyze_screenshot_chat(
                 "tone_notes": str(e),
                 "reply_options": [],
             },
-            mock_usage(model),
+            mock_usage(model, "openai"),
             assumed_lang,
         )

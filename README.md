@@ -1,19 +1,8 @@
 # 🌏 TriLingua Bridge
 
-AI-powered multilingual communication assistant for:
+AI-powered multilingual communication assistant for Mandarin Chinese, Cantonese, Korean, and English.
 
-* 🇨🇳 Mandarin Chinese
-* 🇭🇰 Cantonese
-* 🇰🇷 Korean
-* 🇺🇸 English
-
-Built with:
-
-* Python
-* Streamlit
-* OpenAI API
-* DeepSeek API (fallback)
-* SQLite
+TriLingua Bridge helps language learners and cross-cultural communicators translate, understand tone, write natural replies, analyze chat screenshots, and explain cultural nuance across different languages and social contexts.
 
 ---
 
@@ -21,10 +10,11 @@ Built with:
 
 ## 🌐 AI Translation
 
-* Mandarin ↔ Cantonese ↔ Korean ↔ English
-* Tone-aware translation
-* Natural phrasing adaptation
-* Cross-cultural wording support
+- Mandarin ↔ Cantonese ↔ Korean ↔ English
+- Tone-aware translation
+- Natural phrasing adaptation
+- Cross-cultural wording support
+- Strict target-language control
 
 ---
 
@@ -32,20 +22,20 @@ Built with:
 
 Generate culturally natural replies for:
 
-* Friends
-* Dating / Crush
-* Work
-* Formal situations
-* K-pop style chatting
-* Hong Kong local vibe
+- Friends
+- Dating / crush situations
+- Work
+- Formal situations
+- K-pop style chatting
+- Hong Kong local vibe
 
-Features:
+Includes:
 
-* Multiple reply suggestions
-* Tone analysis
-* Naturalness score
-* Cultural explanation
-* Pronunciation support
+- Multiple reply suggestions
+- Tone analysis
+- Naturalness score
+- Cultural explanation
+- Pronunciation support
 
 ---
 
@@ -53,43 +43,44 @@ Features:
 
 Understand:
 
-* K-pop lyrics
-* Korean dramas
-* Chinese dramas
-* Hong Kong dramas
-* English TV dialogue
-* Internet slang
+- K-pop lyrics
+- Korean dramas
+- Chinese dramas
+- Hong Kong dramas
+- English TV dialogue
+- Internet slang
+- Pop culture references
 
 Includes:
 
-* Hidden meaning explanation
-* Cultural context
-* Slang interpretation
-* Tone notes
-* Clean translation
+- Hidden meaning explanation
+- Cultural context
+- Slang interpretation
+- Tone notes
+- Clean translation
 
 ---
 
 ## ✍️ Grammar Correction
 
-* AI grammar correction
-* Learner-level adaptation
-* Example sentences
-* Multi-language support
+- AI grammar correction
+- Learner-level adaptation
+- Example sentences
+- Multi-language support
 
 ---
 
 ## 🧠 Natural Expression Mode
 
-Turn textbook language into native-like expressions.
+Turn textbook-style language into more natural expressions.
 
 Supports:
 
-* Casual tone
-* Friendly tone
-* Formal tone
-* Cute tone
-* Social-media style
+- Casual tone
+- Friendly tone
+- Formal tone
+- Cute tone
+- Social-media style
 
 ---
 
@@ -97,11 +88,11 @@ Supports:
 
 AI explains:
 
-* Key phrases
-* Slang
-* Pop culture terms
-* Usage examples
-* Cultural nuance
+- Key phrases
+- Slang
+- Pop culture terms
+- Usage examples
+- Cultural nuance
 
 ---
 
@@ -109,11 +100,12 @@ AI explains:
 
 Analyze:
 
-* Politeness
-* Formality
-* Hidden emotion
-* Directness
-* Relationship vibe
+- Politeness
+- Formality
+- Hidden emotion
+- Directness
+- Relationship vibe
+- Possible intent
 
 ---
 
@@ -121,50 +113,53 @@ Analyze:
 
 Supports:
 
-* Audio upload
-* Speech-to-text (Whisper)
-* Pronunciation guide
-* TTS playback
-
-Languages:
-
-* Chinese
-* Cantonese
-* Korean
-* English
+- Audio upload
+- Speech-to-text with OpenAI STT
+- Pronunciation guide
+- Text-to-speech playback
 
 ---
 
 ## 📷 Screenshot Chat Analysis
 
-Upload screenshots from:
+Upload screenshots from apps such as:
 
-* HelloTalk
-* KakaoTalk
-* WeChat
-* Instagram
-* WhatsApp
+- HelloTalk
+- KakaoTalk
+- WeChat
+- Instagram
+- WhatsApp
 
 AI can:
 
-* Analyze conversation tone
-* Explain hidden meaning
-* Suggest replies
-* Detect flirting / cold tone
-* Give cultural advice
+- Analyze conversation tone
+- Explain hidden meaning
+- Suggest replies
+- Detect cold / warm / flirty tone
+- Give cultural advice
+
+---
+
+# 🌏 Supported Languages
+
+| Code | Language |
+| --- | --- |
+| zh | Mandarin Chinese / Simplified Chinese |
+| yue | Cantonese / Traditional Chinese |
+| ko | Korean |
+| en | English |
 
 ---
 
 # 🧩 Tech Stack
 
-| Layer         | Technology                              |
-| ------------- | --------------------------------------- |
-| Frontend      | Streamlit                               |
-| AI APIs       | OpenAI / DeepSeek                       |
-| Database      | SQLite                                  |
-| Speech        | Whisper / gTTS                          |
-| Pronunciation | pypinyin / hangul-romanize / eng_to_ipa |
-| Deployment    | Streamlit Cloud                         |
+| Layer | Technology |
+| --- | --- |
+| Frontend | Streamlit |
+| AI APIs | OpenAI / DeepSeek |
+| Database | SQLite |
+| Speech | OpenAI STT / OpenAI TTS / gTTS |
+| Deployment | Streamlit Cloud |
 
 ---
 
@@ -182,6 +177,7 @@ TriLingua-Bridge/
 ├── requirements.txt
 ├── README.md
 ├── .env.example
+├── .gitignore
 │
 └── assets/
 ```
@@ -190,41 +186,40 @@ TriLingua-Bridge/
 
 # ⚙️ Installation
 
-## 1. Clone repository
+## 1. Clone Repository
 
 ```bash
 git clone https://github.com/yourname/trilingua-bridge.git
-
 cd trilingua-bridge
 ```
 
----
-
-## 2. Install dependencies
+## 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+## 3. Configure Environment Variables
 
-## 3. Configure environment variables
-
-Create `.env`
+Create a local `.env` file:
 
 ```env
+AI_PROVIDER=auto
+
 OPENAI_API_KEY=your_openai_api_key
-
-DEEPSEEK_API_KEY=your_deepseek_api_key
-
 OPENAI_MODEL=gpt-4o-mini
 
+DEEPSEEK_API_KEY=your_deepseek_api_key
 DEEPSEEK_MODEL=deepseek-chat
+
+OPENAI_TTS_MODEL=gpt-4o-mini-tts
+OPENAI_TTS_VOICE=alloy
+OPENAI_STT_MODEL=whisper-1
+
+DB_PATH=trilingua_bridge.db
 ```
 
----
-
-## 4. Run app
+## 4. Run Application
 
 ```bash
 streamlit run app.py
@@ -232,88 +227,47 @@ streamlit run app.py
 
 ---
 
-# 🔑 API Notes
+# 🔐 Security
 
-## OpenAI
+Never upload:
 
-Used for:
-
-* GPT chat
-* Whisper STT
-* Vision screenshot analysis
-
----
-
-## DeepSeek
-
-Used as:
-
-* Automatic fallback provider
-* Lower-cost alternative
-* Mainland China friendly option
-
----
-
-# 🌏 Language Notes
-
-## zh
-
-* Simplified Chinese
-* Mandarin
-
-## yue
-
-* Traditional Chinese
-* Cantonese wording
-
-## ko
-
-* Korean
-
-## en
-
-* English
+```text
+.env
+.streamlit/secrets.toml
+*.db
+```
 
 ---
 
 # 🚀 Future Roadmap
 
-Planned features:
-
-* Real-time microphone mode
-* AI pronunciation scoring
-* Accent training
-* Conversation memory
-* Multi-person chat analysis
-* AI roleplay mode
-* Korean dating culture mode
-* Hong Kong local slang database
-* Streaming AI response
-* Mobile UI optimization
+- Real-time microphone mode
+- AI pronunciation scoring
+- Conversation memory
+- AI relationship meter
+- Mobile app version
 
 ---
 
-# 📌 Disclaimer
+# 📌 Product Vision
 
-This project is intended for:
+TriLingua Bridge is NOT a social app.
 
-* Language learning
-* Cross-cultural communication
-* Educational purposes
+It is an:
 
-AI responses may occasionally be inaccurate.
+```text
+AI Cross-cultural Communication Coach
+```
 
----
+The goal is to help users:
 
-# 👨‍💻 Developer
-
-TriLingua Bridge
-Built by an independent developer exploring:
-
-* AI
-* Language learning
-* K-pop culture
-* Cross-cultural communication
-* Human-centered AI products
+- Understand
+- Interpret
+- Respond naturally
+- Communicate across cultures
 
 ---
+
+# 📄 License
+
+MIT License

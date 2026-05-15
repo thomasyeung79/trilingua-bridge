@@ -472,6 +472,8 @@ def section_header(title: str, sub: str = ""):
 
 
 def hero(title: str, sub: str = "", note: str = ""):
+    st.caption("DEBUG: ui_helper hero loaded")
+
     title = html.escape(str(title))
     sub = html.escape(str(sub))
     note = html.escape(str(note))

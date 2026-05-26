@@ -189,6 +189,102 @@ def phonetic_input_context(*langs: str) -> str:
     )
 
 
+EXPLANATION_KEYS = {
+    "notes",
+    "reason",
+    "tips",
+    "intent",
+    "tone_notes",
+    "tone_summary",
+    "cultural_notes",
+    "caution",
+    "explanation",
+    "why",
+    "meaning",
+    "note",
+}
+
+
+def has_english_explanation(text: str, native_lang: str) -> bool:
+    if native_lang == "en" or not text:
+        return False
+
+    letters = sum(1 for char in text if ("a" <= char.lower() <= "z"))
+    if letters < 18:
+        return False
+
+    return letters / max(len(text), 1) > 0.35
+
+
+def repair_explanation_text(
+    text: str,
+    native_lang: str,
+    model: str,
+    temperature: float,
+) -> str:
+    if not has_english_explanation(text, native_lang):
+        return text
+
+    system_prompt = (
+        "You are a strict translation and localization repair tool.\n"
+        f"Rewrite the text into native_lang={native_lang} only.\n"
+        "Preserve meaning, but remove English explanations.\n"
+        "If the text contains self-deprecating or insulting animal wording, make the explanation neutral and do not add animal-based alternatives.\n"
+        f"{get_output_rule(native_lang)}"
+    )
+    user_prompt = (
+        "Repair this explanation text. Return only the repaired text, no markdown fences.\n\n"
+        f"{text}"
+    )
+    repaired, _ = call_plain_chat(
+        model=model,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        temperature=min(temperature, 0.2),
+    )
+    return repaired.strip() or text
+
+
+def repair_json_explanation_language(
+    value: Any,
+    native_lang: str,
+    model: str,
+    temperature: float,
+    parent_key: str = "",
+) -> Any:
+    if native_lang == "en":
+        return value
+
+    if isinstance(value, dict):
+        return {
+            key: repair_json_explanation_language(
+                item,
+                native_lang,
+                model,
+                temperature,
+                key,
+            )
+            for key, item in value.items()
+        }
+
+    if isinstance(value, list):
+        return [
+            repair_json_explanation_language(
+                item,
+                native_lang,
+                model,
+                temperature,
+                parent_key,
+            )
+            for item in value
+        ]
+
+    if isinstance(value, str) and parent_key in EXPLANATION_KEYS:
+        return repair_explanation_text(value, native_lang, model, temperature)
+
+    return value
+
+
 def get_output_rule(lang: str) -> str:
     rules = {
         "zh": "Use Simplified Chinese only. Do not output English or Korean.",
@@ -651,6 +747,7 @@ def correct_grammar(
     if not data:
         data = {"clean": raw}
 
+    data = repair_json_explanation_language(data, native_lang, model, temperature)
     return data, usage
 
 
@@ -709,6 +806,7 @@ def suggest_natural_expression(
     if not data:
         data = {"better_version": raw}
 
+    data = repair_json_explanation_language(data, native_lang, model, temperature)
     return data, usage
 
 
@@ -814,6 +912,7 @@ def analyze_tone(
     if not data:
         data = {"tone_summary": raw}
 
+    data = repair_json_explanation_language(data, native_lang, model, temperature)
     return data, usage
 
 
@@ -974,6 +1073,7 @@ def chat_reply_coach_advanced(
             "suggested_best_reply": raw,
         }
 
+    data = repair_json_explanation_language(data, native_lang, model, temperature)
     return data, usage, data.get("detected_lang") or detected
 
 
@@ -1050,6 +1150,7 @@ def media_context_explain(
     if not data:
         data = {"clean_translation": raw}
 
+    data = repair_json_explanation_language(data, native_lang, model, temperature)
     return data, usage, data.get("detected_lang") or detected
 
 

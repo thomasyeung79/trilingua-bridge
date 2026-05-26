@@ -152,10 +152,24 @@ Strict language compliance:
 - Obey target_lang, output_lang, and native_lang exactly.
 - For translation, the translated text must be in target_lang only.
 - For explanations, explanations must be in native_lang only.
+- All headings, labels, reasons, tone notes, tips, caveats, and suggestions explanations must be in native_lang only.
 - Never switch to Korean just because the app supports Korean.
 - Never infer a different target language from previous tasks.
 - The current request's target_lang is the only target language that matters.
 - Romanized phonetic input may be interpreted as zh, yue, or ko, but final output must still obey the requested output language.
+"""
+
+
+def quality_guard(native_lang: str) -> str:
+    return f"""
+Quality and safety guard:
+- Explanations must be in native_lang ({native_lang}) only. Do not write English explanations unless native_lang is en.
+- Do not invent intent, identity, emotion, relationship, or context that the user did not provide.
+- If the sentence is odd, insulting, self-deprecating, rude, or ambiguous, handle it neutrally.
+- For grammar correction, preserve the original meaning as closely as possible and only fix grammar.
+- Do not create playful, demeaning, insulting, or animal-related alternative sentences unless the user explicitly asks for them.
+- If the original sentence is self-insulting or potentially offensive, briefly note in native_lang that it may sound self-deprecating or rude, then provide a neutral safer alternative.
+- Examples should demonstrate the grammar or tone pattern with neutral content, not intensify the user's wording.
 """
 
 
@@ -595,6 +609,7 @@ def correct_grammar(
         "You are a grammar coach for multilingual learners.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"Corrected text must be in target_lang: {target_lang}.\n"
         f"Explanations must be in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
@@ -607,10 +622,15 @@ def correct_grammar(
         "level": level,
         "text": text,
         "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
+        "quality_rules": (
+            "clean should only correct grammar and preserve meaning. "
+            "notes must be in native_lang. examples must be neutral practice examples, "
+            "not semantic alternatives that intensify or mock the user's sentence."
+        ),
         "return_schema": {
             "clean": "corrected version",
-            "notes": "brief explanation",
-            "examples": ["example 1", "example 2"],
+            "notes": f"brief explanation in {native_lang}",
+            "examples": [f"neutral example in {target_lang}", f"neutral example in {target_lang}"],
         },
     }
 
@@ -645,6 +665,7 @@ def suggest_natural_expression(
         "Improve the user's sentence so it sounds natural.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"Better version must be in target_lang: {target_lang}.\n"
         f"Explanations must be in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
@@ -657,12 +678,16 @@ def suggest_natural_expression(
         "tone_preference": tone_preference,
         "text": text,
         "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
+        "quality_rules": (
+            "Do not turn self-deprecating, insulting, or odd input into more insulting alternatives. "
+            "If needed, provide a safer neutral version and explain the concern in native_lang."
+        ),
         "return_schema": {
             "better_version": "string",
-            "suggestions": ["string"],
-            "tone_notes": "string",
+            "suggestions": [f"safe alternative in {target_lang}"],
+            "tone_notes": f"string in {native_lang}",
             "naturalness_score": "1-10",
-            "reason": "string",
+            "reason": f"string in {native_lang}",
         },
     }
 
@@ -696,6 +721,7 @@ def explain_vocabulary(
         "You are a vocabulary and phrase explainer.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
@@ -757,10 +783,14 @@ def analyze_tone(
         "native_lang": native_lang,
         "text": text,
         "phonetic_input_context": phonetic_input_context(lang, native_lang),
+        "quality_rules": (
+            "Analyze only the provided sentence. Do not infer the speaker's identity or intent beyond the text. "
+            "All explanation fields must be in native_lang."
+        ),
         "return_schema": {
-            "tone_summary": "string",
-            "intent": "string",
-            "tips": "string",
+            "tone_summary": f"string in {native_lang}",
+            "intent": f"string in {native_lang}",
+            "tips": f"string in {native_lang}",
         },
     }
 

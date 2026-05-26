@@ -134,6 +134,15 @@ Output rules:
 - Do not output Korean unless target_lang or output_lang is ko.
 - Do not output English unless target_lang or output_lang is en.
 - Do not mix languages unless the user explicitly asks for bilingual output.
+
+Phonetic input rules:
+- Users may type Mandarin, Cantonese, or Korean using Latin letters instead of native script.
+- Treat pinyin such as "wo xiang qu", "ni hao", "xiexie" as Mandarin Chinese (zh) when the task/source/target context points to Chinese.
+- Treat Jyutping or Cantonese romanization such as "ngo5 soeng2 heoi3", "nei5 hou2", "m4 goi1" as Cantonese (yue).
+- Treat Korean romanization such as "annyeong haseyo", "gomawo", "mianhae" as Korean (ko).
+- Do not treat phonetic Latin input as English merely because it uses the Latin alphabet.
+- If phonetic input is ambiguous, infer from source_lang, target_lang, native_lang, region/cultural mode, and the user's selected learning language.
+- When correcting, translating, explaining, or coaching, first infer the intended native-script phrase, then complete the requested task.
 """
 
 
@@ -146,7 +155,21 @@ Strict language compliance:
 - Never switch to Korean just because the app supports Korean.
 - Never infer a different target language from previous tasks.
 - The current request's target_lang is the only target language that matters.
+- Romanized phonetic input may be interpreted as zh, yue, or ko, but final output must still obey the requested output language.
 """
+
+
+def phonetic_input_context(*langs: str) -> str:
+    relevant = {lang for lang in langs if lang in ("zh", "yue", "ko", "auto")}
+
+    if not relevant:
+        return ""
+
+    return (
+        "The input may be phonetic Latin text rather than English. "
+        "Support Mandarin pinyin, Cantonese Jyutping/romanization, and Korean romanization. "
+        "Infer the intended zh/yue/ko phrase from context before answering."
+    )
 
 
 def get_output_rule(lang: str) -> str:
@@ -397,14 +420,21 @@ def detect_language_simple(
     system_prompt = (
         "You are a strict language detector. "
         "Return JSON only: {\"lang\":\"zh|yue|ko|en\"}.\n"
-        "Do not translate the text."
+        "Do not translate the text.\n"
+        "If the text is Latin letters but resembles Mandarin pinyin, return zh.\n"
+        "If it resembles Cantonese Jyutping/romanization, especially with tone numbers like ngo5 or m4 goi1, return yue.\n"
+        "If it resembles Korean romanization such as annyeong, gomawo, jinjja, return ko.\n"
+        "Only return en when the text is actually English, not merely Latin-script phonetic input."
     )
 
     prompt = {
         "task": "detect_language",
         "allowed_codes": ["zh", "yue", "ko", "en"],
         "text": text,
-        "hint": "If the text is clearly Cantonese or Traditional Chinese Cantonese wording, return yue.",
+        "hint": (
+            "If the text is clearly Cantonese or Traditional Chinese Cantonese wording, return yue. "
+            "Latin-script phonetic input is supported: pinyin=zh, Jyutping/Cantonese romanization=yue, Korean romanization=ko."
+        ),
     }
 
     data, _, _ = call_json_chat(
@@ -463,6 +493,7 @@ def translate_text(
         "target_lang": target_lang,
         "native_lang": native_lang,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(effective_source, target_lang, native_lang),
         "important_output_rule": get_output_rule(target_lang),
         "do_not_use_other_target_languages": True,
         "return_schema": {
@@ -521,6 +552,7 @@ def explain_message_meaning(
         "source_lang": detected or source_lang,
         "native_lang": native_lang,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(detected or source_lang, native_lang),
         "important_output_rule": get_output_rule(native_lang),
         "return_schema": {
             "detected_lang": "string or null",
@@ -574,6 +606,7 @@ def correct_grammar(
         "native_lang": native_lang,
         "level": level,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
         "return_schema": {
             "clean": "corrected version",
             "notes": "brief explanation",
@@ -623,6 +656,7 @@ def suggest_natural_expression(
         "native_lang": native_lang,
         "tone_preference": tone_preference,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
         "return_schema": {
             "better_version": "string",
             "suggestions": ["string"],
@@ -672,6 +706,7 @@ def explain_vocabulary(
         "native_lang": native_lang,
         "max_items": max_items,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
         "return_schema": {
             "items": [
                 {
@@ -721,6 +756,7 @@ def analyze_tone(
         "lang": lang,
         "native_lang": native_lang,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(lang, native_lang),
         "return_schema": {
             "tone_summary": "string",
             "intent": "string",
@@ -773,6 +809,7 @@ def chat_reply_assistant(
         "target_lang": target_lang,
         "native_lang": native_lang,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(detected or source_lang, target_lang, native_lang),
         "return_schema": {
             "detected_lang": "string or null",
             "reply": "string",
@@ -827,6 +864,7 @@ def chat_reply_coach_advanced(
         "source_lang": detected or source_lang,
         "target_lang": target_lang,
         "native_lang": native_lang,
+        "phonetic_input_context": phonetic_input_context(detected or source_lang, target_lang, native_lang),
         "reply_style": reply_style,
         "important_output_rule": (
             f"Reply options must be in {target_lang}. "
@@ -930,6 +968,7 @@ def media_context_explain(
         "native_lang": native_lang,
         "context_type": context_type,
         "text": text,
+        "phonetic_input_context": phonetic_input_context(detected or source_lang, native_lang),
         "return_schema": {
             "detected_lang": "string or null",
             "clean_translation": "string",

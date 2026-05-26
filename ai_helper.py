@@ -164,11 +164,14 @@ def quality_guard(native_lang: str) -> str:
     return f"""
 Quality and safety guard:
 - Explanations must be in native_lang ({native_lang}) only. Do not write English explanations unless native_lang is en.
+- JSON fields named notes, reason, tips, intent, tone_notes, tone_summary, cultural_notes, caution, explanation, or why must be written in native_lang ({native_lang}) only.
+- JSON fields named clean, better_version, suggestions, examples, reply_options, or translated_text may be in target_lang when they are the actual user-facing sentence, but their explanations must still be in native_lang.
 - Do not invent intent, identity, emotion, relationship, or context that the user did not provide.
 - If the sentence is odd, insulting, self-deprecating, rude, or ambiguous, handle it neutrally.
 - For grammar correction, preserve the original meaning as closely as possible and only fix grammar.
 - Do not create playful, demeaning, insulting, or animal-related alternative sentences unless the user explicitly asks for them.
-- If the original sentence is self-insulting or potentially offensive, briefly note in native_lang that it may sound self-deprecating or rude, then provide a neutral safer alternative.
+- If the original sentence is self-insulting or potentially offensive, briefly note in native_lang that it may sound self-deprecating or rude, then provide a neutral safer alternative that avoids the insult.
+- If the input contains "pig", "猪", "豬", "돼지", or similar animal/self-insult wording, do not suggest "piglet", "cute pig", "可爱的猪", "小猪", "돼지", or any other animal-based alternative. Use neutral alternatives such as admitting a mistake, feeling embarrassed, or clarifying the intended meaning.
 - Examples should demonstrate the grammar or tone pattern with neutral content, not intensify the user's wording.
 """
 
@@ -625,12 +628,16 @@ def correct_grammar(
         "quality_rules": (
             "clean should only correct grammar and preserve meaning. "
             "notes must be in native_lang. examples must be neutral practice examples, "
-            "not semantic alternatives that intensify or mock the user's sentence."
+            "not semantic alternatives that intensify or mock the user's sentence. "
+            "If the text uses self-insulting animal wording, do not create animal-based examples or alternatives."
         ),
         "return_schema": {
             "clean": "corrected version",
             "notes": f"brief explanation in {native_lang}",
-            "examples": [f"neutral example in {target_lang}", f"neutral example in {target_lang}"],
+            "examples": [
+                f"neutral grammar practice example in {target_lang}, not using insults or animal wording",
+                f"neutral grammar practice example in {target_lang}, not using insults or animal wording",
+            ],
         },
     }
 
@@ -680,11 +687,12 @@ def suggest_natural_expression(
         "phonetic_input_context": phonetic_input_context(target_lang, native_lang),
         "quality_rules": (
             "Do not turn self-deprecating, insulting, or odd input into more insulting alternatives. "
-            "If needed, provide a safer neutral version and explain the concern in native_lang."
+            "If needed, provide a safer neutral version and explain the concern in native_lang. "
+            "If input contains pig/猪/豬/돼지 or similar animal self-insult wording, avoid all animal-based alternatives."
         ),
         "return_schema": {
             "better_version": "string",
-            "suggestions": [f"safe alternative in {target_lang}"],
+            "suggestions": [f"safe neutral alternative in {target_lang}, avoiding insults and animal wording"],
             "tone_notes": f"string in {native_lang}",
             "naturalness_score": "1-10",
             "reason": f"string in {native_lang}",
@@ -773,6 +781,7 @@ def analyze_tone(
         "You are a tone and intent analyzer.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
@@ -785,7 +794,8 @@ def analyze_tone(
         "phonetic_input_context": phonetic_input_context(lang, native_lang),
         "quality_rules": (
             "Analyze only the provided sentence. Do not infer the speaker's identity or intent beyond the text. "
-            "All explanation fields must be in native_lang."
+            "All explanation fields must be in native_lang. "
+            "For self-insulting animal wording, identify the wording as self-deprecating or potentially rude and suggest neutral wording."
         ),
         "return_schema": {
             "tone_summary": f"string in {native_lang}",
@@ -885,6 +895,7 @@ def chat_reply_coach_advanced(
         f"Explanations must be in native_lang: {native_lang}.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
 
@@ -899,6 +910,7 @@ def chat_reply_coach_advanced(
         "important_output_rule": (
             f"Reply options must be in {target_lang}. "
             f"Tone notes, cultural notes and reason must be in {native_lang}. "
+            "Do not create demeaning, self-insulting, or animal-based alternatives. "
             "Do not use Korean unless target_lang or native_lang is ko. "
             "Do not use English unless target_lang or native_lang is en."
         ),
@@ -911,10 +923,10 @@ def chat_reply_coach_advanced(
                     "tone": "tone description",
                 }
             ],
-            "tone_notes": "string",
-            "cultural_notes": "string",
+            "tone_notes": f"string in {native_lang}",
+            "cultural_notes": f"string in {native_lang}",
             "suggested_best_reply": "string",
-            "reason": "string",
+            "reason": f"string in {native_lang}",
             "pronunciation_guide": {
                 "lang": "string",
                 "text": "string",
@@ -988,6 +1000,7 @@ def media_context_explain(
         "You explain lyrics, drama dialogue, internet slang and cultural context.\n"
         f"{language_rules()}\n"
         f"{strict_language_guard()}\n"
+        f"{quality_guard(native_lang)}\n"
         f"Explain in native_lang: {native_lang}. {get_output_rule(native_lang)}\n"
         f"{persona_instructions(persona_profile)}"
     )
@@ -1005,8 +1018,8 @@ def media_context_explain(
             "key_phrases": [
                 {
                     "phrase": "string",
-                    "meaning": "string",
-                    "note": "string",
+                    "meaning": f"string in {native_lang}",
+                    "note": f"string in {native_lang}",
                 }
             ],
             "slang_pop_culture": [

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "trilingua-bridge"
+version = "2.1.0"
+description = "AI language coach for Mandarin, Cantonese, Korean, English, and Japanese"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit>=1.32",
+    "python-dotenv>=1.0",
+    "openai>=1.30",
+    "gTTS>=2.5",
+    "langdetect>=1.0.9",
+    "pypinyin>=0.50",
+    "hangul-romanize>=0.1.0",
+    "eng-to-ipa>=0.0.2",
+    "pykakasi>=2.2",
+    "anthropic>=0.30",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG", "PTH", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*", "check_*"]

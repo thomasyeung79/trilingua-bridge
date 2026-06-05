@@ -1,13 +1,13 @@
 # Core
-streamlit>=1.32
-python-dotenv>=1.0
+streamlit>=1.33.0
+python-dotenv>=1.0.1
 
 # LLM providers
-openai>=1.30
+openai>=1.30.0
 anthropic>=0.30
 
 # Audio: TTS, STT, romanization
-gTTS>=2.5
+gTTS>=2.5.1
 langdetect>=1.0.9
 pypinyin>=0.50
 hangul-romanize>=0.1.0
@@ -16,7 +16,7 @@ pykakasi>=2.2
 
 # Optional but recommended (the app degrades gracefully if these are missing)
 streamlit-mic-recorder>=0.0.8   # in-browser microphone capture
-pycantonese>=3.4                # Jyutping romanization for Cantonese
+pycantonese>=4.0.0              # Jyutping romanization for Cantonese
 
 # Dev
 pytest>=7.0

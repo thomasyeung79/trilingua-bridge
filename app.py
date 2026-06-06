@@ -32,11 +32,69 @@ from modules.pages import (
 
 load_dotenv()
 
+
+# ── PWA injection ─────────────────────────────────
+def inject_pwa_tags():
+    """Inject PWA manifest link, meta tags, and service worker registration."""
+    import streamlit as st
+
+    js = """
+<script>
+(function() {
+    // ── Manifest link ──
+    var link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = '/manifest.json';
+    document.head.appendChild(link);
+
+    // ── Apple / iOS meta tags ──
+    var tags = {
+        'apple-mobile-web-app-capable': 'yes',
+        'apple-mobile-web-app-status-bar-style': 'default',
+        'apple-mobile-web-app-title': 'TriLingua Bridge',
+        'mobile-web-app-capable': 'yes',
+        'application-name': 'TriLingua Bridge',
+        'theme-color': '#2563eb',
+    };
+    for (var name in tags) {
+        var m = document.createElement('meta');
+        if (name.indexOf('apple') !== -1 || name.indexOf('mobile') !== -1 || name === 'application-name') {
+            m.setAttribute('name', name);
+        } else {
+            m.setAttribute('name', name);
+        }
+        m.content = tags[name];
+        document.head.appendChild(m);
+    }
+
+    // ── Apple touch icon ──
+    var appleIcon = document.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    appleIcon.href = '/icon-192.png';
+    document.head.appendChild(appleIcon);
+
+    // ── Service worker registration ──
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(function() {
+            // Silently fail if SW not available (e.g. direct Streamlit access)
+        });
+    }
+})();
+</script>
+"""
+    st.markdown(js, unsafe_allow_html=True)
+
+
 st.set_page_config(
     page_title="TriLingua Bridge",
+    page_icon="🌐",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+# ── PWA manifest & service worker injection ─────────
+inject_pwa_tags()
+# ── end PWA ──────────────────────────────────────────
 
 inject_css()
 inject_product_css()

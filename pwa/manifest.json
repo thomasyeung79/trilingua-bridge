@@ -1,0 +1,56 @@
+{
+  "name": "TriLingua Bridge",
+  "short_name": "TriLingua",
+  "description": "Cross-cultural communication coach for Mandarin, Cantonese, Korean, Japanese, and English",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f7fb",
+  "theme_color": "#2563eb",
+  "categories": ["education", "languages", "communication"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "related_applications": [],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "Chat Coach",
+      "short_name": "Coach",
+      "description": "Get culturally tuned replies",
+      "url": "/?page=Coach"
+    },
+    {
+      "name": "Translate",
+      "short_name": "Translate",
+      "description": "Context-aware translation",
+      "url": "/?page=Translate"
+    },
+    {
+      "name": "Grammar",
+      "short_name": "Grammar",
+      "description": "Grammar correction with level notes",
+      "url": "/?page=Grammar"
+    }
+  ]
+}

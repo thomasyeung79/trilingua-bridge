@@ -41,6 +41,9 @@ coverage.xml
 *.db-wal
 *.db-shm
 
+# --- GitHub Actions (needs PAT with workflow scope) ---
+.github/
+
 # --- Editors / IDEs ---
 .vscode/
 .idea/
@@ -61,3 +64,8 @@ tmp/
 
 # --- Streamlit runtime ---
 .streamlit/cache/
+.streamlit/_run.err.log
+.streamlit/_run.out.log
+
+# --- PWA runtime (placeholder PNGs, regenerated on first launch) ---
+pwa/icon-*.png

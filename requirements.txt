@@ -1,5 +1,7 @@
 # Core
 streamlit>=1.33.0
+# python-dotenv is kept for local development (.env file loading).
+# On Streamlit Cloud it is harmless — secrets are read via st.secrets instead.
 python-dotenv>=1.0.1
 
 # LLM providers
@@ -17,7 +19,3 @@ pykakasi>=2.2
 # Optional but recommended (the app degrades gracefully if these are missing)
 streamlit-mic-recorder>=0.0.8   # in-browser microphone capture
 pycantonese>=4.0.0              # Jyutping romanization for Cantonese
-
-# Dev
-pytest>=7.0
-ruff>=0.4

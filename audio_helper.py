@@ -211,7 +211,7 @@ def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
 
     Priority:
     1. OpenAI TTS
-    2. gTTS fallback for zh/en/ko
+    2. gTTS fallback for zh/en/ko/ja
 
     Note:
     Cantonese (yue) intentionally does not fallback to gTTS zh-CN,
@@ -247,6 +247,7 @@ def transcribe_audio(
         "yue": "zh",
         "en": "en",
         "ko": "ko",
+        "ja": "ja",
     }
 
     language = whisper_lang_map.get(preferred_lang)

@@ -303,6 +303,14 @@ def localized_fallback_text(native_lang: str, key: str) -> str:
             "cultural_notes": "Cultural notes are unavailable right now.",
             "reason": "The AI service is unavailable. Check your API key or network settings.",
         },
+        "ja": {
+            "reply_1": "現在、返信オプションを生成できません。",
+            "reply_2": "後でもう一度試すか、AIサービスの設定を確認してください。",
+            "reply_3": "現在はローカルフォールバックメッセージのみ表示されています。",
+            "tone_notes": "現在、トーン分析を利用できません。",
+            "cultural_notes": "現在、文化的な解説を生成できません。",
+            "reason": "AIサービスが利用できません。APIキーまたはネットワーク設定を確認してください。",
+        },
     }
     return texts.get(native_lang, texts["en"]).get(key, texts["en"].get(key, ""))
 
@@ -1102,58 +1110,6 @@ def analyze_tone(
 
 
 # =========================
-# Chat Reply Assistant
-# =========================
-
-def chat_reply_assistant(
-    text: str,
-    source_lang: Lang,
-    target_lang: Lang,
-    native_lang: Lang,
-    temperature: float,
-    model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any], Optional[str]]:
-    system_prompt = (
-        "You are a helpful chat reply assistant.\n"
-        f"{language_rules()}\n"
-        f"{strict_language_guard()}\n"
-        f"Reply must be in target_lang: {target_lang}. {get_output_rule(target_lang)}\n"
-        f"{persona_instructions(persona_profile)}"
-    )
-
-    detected = None
-
-    if source_lang == "auto":
-        detected = detect_language_simple(text, model, temperature, persona_profile)
-
-    prompt = {
-        "task": "chat_reply",
-        "source_lang": detected or source_lang,
-        "target_lang": target_lang,
-        "native_lang": native_lang,
-        "text": text,
-        "phonetic_input_context": phonetic_input_context(detected or source_lang, target_lang, native_lang),
-        "return_schema": {
-            "detected_lang": "string or null",
-            "reply": "string",
-        },
-    }
-
-    data, usage, raw = call_json_chat(
-        model=model,
-        system_prompt=system_prompt,
-        user_prompt=json.dumps(prompt, ensure_ascii=False),
-        temperature=temperature,
-    )
-
-    if data.get("mock"):
-        return data["message"], usage, detected
-
-    return data.get("reply", raw), usage, data.get("detected_lang") or detected
-
-
-# =========================
 # Advanced Chat Coach
 # =========================
 
@@ -1166,6 +1122,7 @@ def chat_reply_coach_advanced(
     temperature: float,
     model: str,
     persona_profile: Dict[str, Any],
+    conversation_context: Optional[List[Dict[str, str]]] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
     detected = None
 
@@ -1217,6 +1174,12 @@ def chat_reply_coach_advanced(
             },
         },
     }
+
+    if conversation_context:
+        prompt["conversation_history"] = [
+            {"role": turn.get("role", "user"), "content": turn.get("text", "")}
+            for turn in conversation_context
+        ]
 
     data, usage, raw = call_json_chat(
         model=model,
@@ -1357,14 +1320,54 @@ def analyze_screenshot_chat(
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
     openai_client = get_openai_client()
 
+    # Localized error texts for screenshot analysis
+    _screenshot_err = {
+        "summary": {
+            "en": "Screenshot analysis requires an OpenAI vision model.",
+            "zh": "截图分析需要 OpenAI 视觉模型支持。",
+            "yue": "截圖分析需要 OpenAI 視覺模型支援。",
+            "ko": "스크린샷 분석에는 OpenAI 비전 모델이 필요합니다.",
+            "ja": "スクリーンショット分析にはOpenAI視覚モデルが必要です。",
+        },
+        "tone_notes": {
+            "en": "Screenshot analysis does not automatically switch to other providers in the current version.",
+            "zh": "当前版本不会把图片分析自动切换到其他提供商。",
+            "yue": "目前版本唔會自動切換截圖分析到其他提供商。",
+            "ko": "현재 버전에서는 스크린샷 분석이 다른 제공업체로 자동 전환되지 않습니다.",
+            "ja": "現在のバージョンではスクリーンショット分析は他のプロバイダーに自動切り替えされません。",
+        },
+        "cultural_notes": {
+            "en": "Please configure OPENAI_API_KEY in your environment.",
+            "zh": "请先配置 OPENAI_API_KEY。",
+            "yue": "請先設定 OPENAI_API_KEY。",
+            "ko": "OPENAI_API_KEY를 설정해 주세요.",
+            "ja": "OPENAI_API_KEYを環境変数に設定してください。",
+        },
+        "failed": {
+            "en": "Screenshot analysis failed.",
+            "zh": "截图分析失败。",
+            "yue": "截圖分析失敗。",
+            "ko": "스크린샷 분석에 실패했습니다.",
+            "ja": "スクリーンショット分析に失敗しました。",
+        },
+        "error": {
+            "en": "An error occurred during analysis. Please try again.",
+            "zh": "分析过程中发生错误，请重试。",
+            "yue": "分析過程中發生錯誤，請再試一次。",
+            "ko": "분석 중 오류가 발생했습니다. 다시 시도해 주세요.",
+            "ja": "分析中にエラーが発生しました。もう一度お試しください。",
+        },
+    }
+
     if not openai_client:
+        _e = _screenshot_err
+        _nl = native_lang
         data = {
-            "summary": "截图分析需要 OpenAI 视觉模型支持。",
-            "tone_notes": "当前版本不会把图片分析自动切换到 DeepSeek。",
-            "cultural_notes": "请先配置 OPENAI_API_KEY。",
+            "summary": _e["summary"].get(_nl, _e["summary"]["en"]),
+            "tone_notes": _e["tone_notes"].get(_nl, _e["tone_notes"]["en"]),
+            "cultural_notes": _e["cultural_notes"].get(_nl, _e["cultural_notes"]["en"]),
             "reply_options": [],
         }
-        data = repair_json_explanation_language(data, native_lang, model, temperature)
         return (
             data,
             mock_usage(model, "openai"),
@@ -1454,10 +1457,12 @@ def analyze_screenshot_chat(
         data = repair_json_explanation_language(data, native_lang, model, temperature)
         return data, usage_from_response(response, "openai"), data.get("detected_lang") or assumed_lang
 
-    except Exception as e:
+    except Exception:
+        _e = _screenshot_err
+        _nl = native_lang
         data = {
-            "summary": "截图分析失败。",
-            "tone_notes": str(e),
+            "summary": _e["failed"].get(_nl, _e["failed"]["en"]),
+            "tone_notes": _e["error"].get(_nl, _e["error"]["en"]),
             "reply_options": [],
         }
         data = repair_json_explanation_language(data, native_lang, model, temperature)

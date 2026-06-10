@@ -82,9 +82,16 @@ REGION_OPTIONS = [
     ("cn-mainland", "region_mainland_cn"),
     ("hk-cantonese", "region_hk_yue"),
     ("kr", "region_korean"),
+    ("jp", "region_jp"),
     ("au-en", "region_au_en"),
     ("us-en", "region_us_en"),
 ]
+
+# Max messages in Coach conversation memory (each turn = 2 messages: user + assistant)
+MAX_CONVERSATION_MESSAGES = 12
+
+# Max recent messages to include as AI context
+MAX_CONTEXT_MESSAGES = 8
 
 
 # ═══════════════════════════════════════════════════
@@ -960,6 +967,10 @@ def build_region_guidelines(region_code: str, target_lang: str) -> str:
             "Korean mode: Adapt honorifics properly, polite endings if not close, "
             "avoid excessive emojis, indirect yet clear."
         ),
+        "jp": (
+            "Japanese mode: Use appropriate keigo (polite language), "
+            "consider formality levels, avoid overly direct wording, concise and courteous."
+        ),
         "au-en": (
             "Australian English mode: Friendly, relaxed phrasing, light emoji ok, "
             "direct yet casual tone."
@@ -1640,36 +1651,65 @@ def render_mean_coach_kpop_page(page: str):
 
     section_header(title_map[page], sub_map[page])
 
+    # ── Coach state management ───────────────────────────
+    if page == "Coach":
+        if st.session_state.pop("_pending_swap", False):
+            _src = st.session_state.get("coach_source_lang", "auto")
+            _tgt = st.session_state.get("coach_target_lang", "en")
+            if _src != "auto":
+                st.session_state.coach_source_lang = _tgt
+                st.session_state.coach_target_lang = _src
+                st.session_state.target_lang = _src
+            st.rerun()
+
+        if "coach_conversation" not in st.session_state:
+            st.session_state.coach_conversation = []
+
+        _src_lang = st.session_state.get("coach_source_lang", "auto")
+        _tgt_lang = st.session_state.get("coach_target_lang", "en")
+        _region = st.session_state.get("coach_region_mode", "cn-mainland")
+        _ctx_key = f"{_src_lang}|{_tgt_lang}|{_region}"
+        _prev_ctx = st.session_state.get("_coach_ctx_key", "")
+        if _ctx_key != _prev_ctx and st.session_state.coach_conversation:
+            st.session_state.coach_conversation = []
+            st.info(t("conversation_reset"))
+        st.session_state._coach_ctx_key = _ctx_key
+    # ── end state management ──────────────────────────────
+
     text_key = f"{mode_map[page]}_text"
     region_code = st.session_state.get("coach_region_mode", "cn-mainland")
 
     if page == "Coach":
-        reg_col1, reg_col2 = st.columns([2, 2])
-        with reg_col1:
-            region_code = st.selectbox(
-                TEXTS.get(st.session_state.ui_lang, {}).get("region_mode", "Regional mode"),
-                [code for code, _ in REGION_OPTIONS],
-                index=(
-                    [code for code, _ in REGION_OPTIONS].index(region_code)
-                    if region_code in [code for code, _ in REGION_OPTIONS]
-                    else 0
-                ),
-                format_func=region_label,
-                key="coach_region_mode",
+        # ── Language selector bar (before input) ──
+        swap_col1, swap_col2, swap_col3 = st.columns([2, 1, 2])
+        with swap_col1:
+            source_choice = st.selectbox(
+                t("language_of_text"), ["auto"] + STUDY_LANG_CODES, index=0,
+                format_func=lambda code: t("auto_detect") if code == "auto" else get_lang_display().get(code, code),
+                key="coach_source_lang",
             )
-        with reg_col2:
-            styles = [
-                t("style_friend"), t("style_crush"), t("style_work"),
-                t("style_formal"), t("style_cute"), t("style_cold"),
-                t("style_kpop"), t("style_hk"),
-            ]
-            reply_style = st.selectbox(t("relation_mode"), styles, index=0, key="coach_style_select")
+        with swap_col2:
+            _swap_disabled = st.session_state.get("coach_source_lang") == "auto"
+            if st.button("⇄", key="coach_swap_btn", use_container_width=True, disabled=_swap_disabled):
+                st.session_state._pending_swap = True
+                st.rerun()
+            if _swap_disabled:
+                st.caption(t("swap_unavailable_auto"))
+        with swap_col3:
+            if st.session_state.target_lang not in STUDY_LANG_CODES:
+                st.session_state.target_lang = "en"
+            if st.session_state.get("coach_target_lang") not in STUDY_LANG_CODES:
+                st.session_state.coach_target_lang = st.session_state.target_lang
+            target_choice = st.selectbox(
+                t("filter_target"), STUDY_LANG_CODES,
+                index=STUDY_LANG_CODES.index(st.session_state.target_lang),
+                format_func=lambda code: get_lang_display().get(code, code),
+                key="coach_target_lang",
+            )
+            if st.session_state.coach_target_lang != st.session_state.target_lang:
+                st.session_state.target_lang = st.session_state.coach_target_lang
+        run_button = st.button(t("run"), use_container_width=True)
 
-    product_note(
-        ui_text("page_tip_title", "How to use this page"),
-        ui_text("coach_mean_tip", "Use a real chat line or situation. The app will explain tone, hidden meaning, or help you prepare a reply."),
-        "🎯",
-    )
     phonetic_input_caption()
 
     apply_pending_text_area_update(text_key)
@@ -1697,57 +1737,56 @@ def render_mean_coach_kpop_page(page: str):
         run_button = st.button(t("run"), use_container_width=True)
 
     elif page == "Coach":
-        col1, col2 = st.columns(2)
-        with col1:
-            source_choice = st.selectbox(
-                t("language_of_text"), ["auto"] + STUDY_LANG_CODES, index=0,
-                format_func=lambda code: t("auto_detect") if code == "auto" else get_lang_display().get(code, code),
-                key="coach_source_lang",
-            )
-        with col2:
-            run_button = st.button(t("run"), use_container_width=True)
+        # ── Context settings (collapsible, after input) ──
+        adv_label = TEXTS.get(st.session_state.ui_lang, {}).get("advanced_settings", "Settings")
+        with st.expander("⚙️ " + adv_label, expanded=False):
+            reg_col1, reg_col2 = st.columns([2, 2])
+            with reg_col1:
+                region_code = st.selectbox(
+                    TEXTS.get(st.session_state.ui_lang, {}).get("region_mode", "Regional mode"),
+                    [code for code, _ in REGION_OPTIONS],
+                    index=([code for code, _ in REGION_OPTIONS].index(region_code) if region_code in [code for code, _ in REGION_OPTIONS] else 0),
+                    format_func=region_label,
+                    key="coach_region_mode",
+                )
+            with reg_col2:
+                styles = [t("style_friend"), t("style_crush"), t("style_work"), t("style_formal"), t("style_cute"), t("style_cold"), t("style_kpop"), t("style_hk")]
+                reply_style = st.selectbox(t("relation_mode"), styles, index=0, key="coach_style_select")
+            st.caption(ui_text("coach_mean_tip", "Tip: Use a real message or situation for best results."))
 
+        # ── Screenshot analysis (sibling expander, not nested) ──
         with st.expander(f"📷 {t('screenshot_mode')}", expanded=False):
             s_col1, s_col2 = st.columns(2)
             with s_col1:
-                ss_lang = st.selectbox(
-                    t("language_of_text"), ["auto"] + STUDY_LANG_CODES, index=0,
+                ss_lang = st.selectbox(t("language_of_text"), ["auto"] + STUDY_LANG_CODES, index=0,
                     format_func=lambda code: t("auto_detect") if code == "auto" else get_lang_display().get(code, code),
-                    key="screenshot_lang",
-                )
+                    key="screenshot_lang")
             with s_col2:
                 analyze_btn = st.button(t("analyze_screenshot_btn"), use_container_width=True, key="btn_analyze_screenshot")
-
             image_file = st.file_uploader(t("upload_screenshot"), type=["png", "jpg", "jpeg", "webm"], key="screenshot_uploader")
             if analyze_btn:
-                if not image_file:
-                    st.warning(t("please_upload_image_first"))
-                else:
-                    image_data = image_file.read()
-                    persona_profile = get_persona_profile(ss_lang, st.session_state.native_lang)
-                    persona_profile["region_mode"] = region_code
-                    persona_profile["region_guidelines"] = build_region_guidelines(region_code, st.session_state.target_lang)
-                    if HAVE_SCREENSHOT_ANALYZE and callable(analyze_screenshot_chat):
-                        run_ai_task(
-                            task_fn=analyze_screenshot_chat,
-                            task_kwargs=dict(
-                                image_bytes=image_data, image_name=image_file.name,
-                                assumed_lang=None if ss_lang == "auto" else ss_lang,
-                                native_lang=st.session_state.native_lang, target_lang=st.session_state.target_lang,
-                                region_mode=region_code, temperature=st.session_state.temperature,
-                                model=st.session_state.model_input, persona_profile=persona_profile,
-                            ),
-                            history_kwargs=dict(
-                                username=st.session_state.username, mode="screenshot",
-                                source_lang=ss_lang, target_lang=st.session_state.native_lang,
-                                native_lang=st.session_state.native_lang,
-                                persona_code=st.session_state.persona_code, ui_lang=st.session_state.ui_lang,
-                                user_input=f"[screenshot] {image_file.name}",
-                            ),
-                            pron_lang=None,
-                        )
+                    if not image_file:
+                        st.warning(t("please_upload_image_first"))
                     else:
-                        st.warning(TEXTS.get(st.session_state.ui_lang, {}).get("screenshot_not_available", "截图分析暂不可用。"))
+                        image_data = image_file.read()
+                        persona_profile = get_persona_profile(ss_lang, st.session_state.native_lang)
+                        persona_profile["region_mode"] = region_code
+                        persona_profile["region_guidelines"] = build_region_guidelines(region_code, st.session_state.target_lang)
+                        if HAVE_SCREENSHOT_ANALYZE and callable(analyze_screenshot_chat):
+                            run_ai_task(task_fn=analyze_screenshot_chat,
+                                task_kwargs=dict(image_bytes=image_data, image_name=image_file.name,
+                                    assumed_lang=None if ss_lang == "auto" else ss_lang,
+                                    native_lang=st.session_state.native_lang, target_lang=st.session_state.target_lang,
+                                    region_mode=region_code, temperature=st.session_state.temperature,
+                                    model=st.session_state.model_input, persona_profile=persona_profile),
+                                history_kwargs=dict(username=st.session_state.username, mode="screenshot",
+                                    source_lang=ss_lang, target_lang=st.session_state.native_lang,
+                                    native_lang=st.session_state.native_lang,
+                                    persona_code=st.session_state.persona_code, ui_lang=st.session_state.ui_lang,
+                                    user_input=f"[screenshot] {image_file.name}"),
+                                pron_lang=None)
+                        else:
+                            st.warning(TEXTS.get(st.session_state.ui_lang, {}).get("screenshot_not_available", "截图分析暂不可用。"))
 
     else:
         col1, col2 = st.columns(2)
@@ -1764,27 +1803,61 @@ def render_mean_coach_kpop_page(page: str):
         if not text.strip():
             st.warning(t("enter_text_warn"))
         elif page == "Coach":
-            persona_profile = get_persona_profile(source_choice, st.session_state.target_lang)
+            persona_profile = get_persona_profile(source_choice, target_choice)
             persona_profile["region_mode"] = region_code
-            persona_profile["region_guidelines"] = build_region_guidelines(region_code, st.session_state.target_lang)
+            persona_profile["region_guidelines"] = build_region_guidelines(region_code, target_choice)
             style_with_region = f"{reply_style} | region_mode={region_code}"
+
+            # ── Build conversation context from recent messages ──
+            conv = st.session_state.get("coach_conversation", [])
+            recent_context = conv[-MAX_CONTEXT_MESSAGES:] if len(conv) > 2 else conv
+            # ── end context ──
+
             result_pair = run_ai_task(
                 task_fn=chat_reply_coach_advanced,
                 task_kwargs=dict(
-                    text=text, source_lang=source_choice, target_lang=st.session_state.target_lang,
+                    text=text, source_lang=source_choice, target_lang=target_choice,
                     native_lang=st.session_state.native_lang, reply_style=style_with_region,
                     temperature=st.session_state.temperature, model=st.session_state.model_input,
                     persona_profile=persona_profile,
+                    conversation_context=recent_context,
                 ),
                 history_kwargs=dict(
                     username=st.session_state.username, mode="coach",
-                    source_lang=source_choice, target_lang=st.session_state.target_lang,
+                    source_lang=source_choice, target_lang=target_choice,
                     native_lang=st.session_state.native_lang,
                     persona_code=st.session_state.persona_code, ui_lang=st.session_state.ui_lang,
                     user_input=text,
                 ),
-                pron_lang=st.session_state.target_lang,
+                pron_lang=target_choice,
             )
+
+            # ── Append to Coach conversation memory ──
+            if result_pair is not None:
+                result_data, _ = result_pair
+                # Assistant text: use suggested_best_reply, or first reply option
+                assistant_text = ""
+                if isinstance(result_data, dict):
+                    assistant_text = (
+                        result_data.get("suggested_best_reply")
+                        or (result_data.get("reply_options") or [{}])[0].get("text", "")
+                        or ""
+                    )
+                if isinstance(result_data, str):
+                    assistant_text = result_data
+
+                if assistant_text:
+                    st.session_state.coach_conversation.append(
+                        {"role": "user", "text": text}
+                    )
+                    st.session_state.coach_conversation.append(
+                        {"role": "assistant", "text": assistant_text}
+                    )
+                    # Trim to max messages
+                    while len(st.session_state.coach_conversation) > MAX_CONVERSATION_MESSAGES:
+                        st.session_state.coach_conversation.pop(0)
+            # ── end conversation memory append ──
+
             try:
                 detected_code = detect_language_code(text, st.session_state.model_input, st.session_state.temperature, persona_profile) or source_choice
                 if detected_code in ("zh", "yue", "ko", "ja", "en"):
@@ -1837,6 +1910,18 @@ def render_mean_coach_kpop_page(page: str):
                 ),
                 pron_lang=st.session_state.native_lang,
             )
+
+    # ── Conversation history display (Coach, below results) ──
+    if page == "Coach":
+        conv = st.session_state.get("coach_conversation", [])
+        if conv:
+            st.markdown("### 💬 Conversation")
+            for turn in conv:
+                with st.chat_message(turn.get("role", "user")):
+                    st.write(turn.get("text", ""))
+            if st.button(t("new_conversation"), use_container_width=True, key="coach_new_conv"):
+                st.session_state.coach_conversation = []
+                st.rerun()
 
 
 # ═══════════════════════════════════════════════════

@@ -74,7 +74,8 @@ def inject_pwa_tags():
     document.head.appendChild(appleIcon);
 
     // ── Service worker registration ──
-    if ('serviceWorker' in navigator) {
+    // Skip on Streamlit Cloud (no static file serving for /sw.js)
+    if ('serviceWorker' in navigator && !window.location.hostname.includes('streamlit.app')) {
         navigator.serviceWorker.register('/sw.js').catch(function() {
             // Silently fail if SW not available (e.g. direct Streamlit access)
         });

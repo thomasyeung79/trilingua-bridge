@@ -9,7 +9,6 @@ __pycache__/
 venv/
 env/
 ENV/
-.python-version
 
 # --- Packaging / build ---
 build/

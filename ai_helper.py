@@ -1,7 +1,7 @@
 import os
 import json
 import base64
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from dotenv import load_dotenv
 from openai import OpenAI

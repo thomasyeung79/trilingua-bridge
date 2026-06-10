@@ -19,3 +19,6 @@ pykakasi>=2.2
 # Optional but recommended (the app degrades gracefully if these are missing)
 streamlit-mic-recorder>=0.0.8   # in-browser microphone capture
 pycantonese>=4.0.0              # Jyutping romanization for Cantonese
+
+# PostgreSQL / Supabase (optional — only needed when USE_POSTGRES=true)
+psycopg2-binary>=2.9

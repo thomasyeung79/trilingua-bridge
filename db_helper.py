@@ -7,14 +7,74 @@ import secrets
 from typing import Optional, List, Dict, Any
 
 
+# ── Dual-mode helpers ─────────────────────────────────────────
+
+# ── Configuration helpers ────────────────────────────────────
+
+_PG_CONFIG_KEYS = ["SUPABASE_DB_HOST", "SUPABASE_DB_NAME", "SUPABASE_DB_USER", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_PORT"]
+
+
+def _get_secret(key: str) -> str:
+    """Read a config value from environment variables or Streamlit secrets."""
+    value = os.environ.get(key)
+    if not value:
+        try:
+            import streamlit as st
+            value = st.secrets.get(key) or ""
+        except Exception:
+            pass
+    return value or ""
+
+
+def _get_pg_config() -> dict:
+    """Read and validate PostgreSQL configuration from env / Streamlit secrets."""
+    try:
+        port = int(_get_secret("SUPABASE_DB_PORT") or "5432")
+    except ValueError:
+        raise RuntimeError(
+            "Invalid PostgreSQL configuration: SUPABASE_DB_PORT must be an integer. "
+            "Set USE_POSTGRES=false to use SQLite, or fix the port value."
+        )
+    config = {
+        "host": _get_secret("SUPABASE_DB_HOST"),
+        "dbname": _get_secret("SUPABASE_DB_NAME") or "postgres",
+        "user": _get_secret("SUPABASE_DB_USER") or "postgres",
+        "password": _get_secret("SUPABASE_DB_PASSWORD"),
+        "port": port,
+    }
+    missing = [k for k in ("host", "password") if not config[k]]
+    if missing:
+        raise RuntimeError(
+            f"Missing PostgreSQL configuration: SUPABASE_DB_HOST, SUPABASE_DB_PASSWORD. "
+            "Set USE_POSTGRES=false to use SQLite, or configure these variables."
+        )
+    return config
+
+
+def _use_postgres() -> bool:
+    """Check whether to use PostgreSQL (Supabase) instead of SQLite."""
+    return os.environ.get("USE_POSTGRES", "false").lower() == "true"
+
+
+def _placeholder() -> str:
+    """Return the SQL placeholder character for the active database."""
+    return "%s" if _use_postgres() else "?"
+
+
+def _now_value() -> float:
+    """Return the current time as a Unix epoch float (compatible with both DBs)."""
+    return time.time()
+
+
+# ── Connection management ──────────────────────────────────────
+
 def get_db_path() -> str:
     """
-    Priority:
-    1. Streamlit secrets DB_PATH
-    2. Environment variable DB_PATH
-    3. Environment variable TRILINGUA_DB_PATH
-    4. Default local database
+    SQLite-only: determine the local database file path.
+    Ignored when USE_POSTGRES=true.
     """
+    if _use_postgres():
+        return ""
 
     try:
         import streamlit as st
@@ -32,7 +92,34 @@ def get_db_path() -> str:
     )
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection():
+    """
+    Return a database connection for the active mode.
+
+    PostgreSQL (USE_POSTGRES=true):
+        Returns a psycopg2 connection with RealDictCursor.
+        Configuration via SUPABASE_DB_HOST / _NAME / _USER / _PASSWORD / _PORT.
+
+    SQLite (default):
+        Returns a sqlite3 connection with Row factory.
+    """
+    if _use_postgres():
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+
+        pg_config = _get_pg_config()
+
+        return psycopg2.connect(
+            host=pg_config["host"],
+            dbname=pg_config["dbname"],
+            user=pg_config["user"],
+            password=pg_config["password"],
+            port=pg_config["port"],
+            sslmode="require",
+            cursor_factory=RealDictCursor,
+            connect_timeout=10,
+        )
+
     db_path = get_db_path()
     folder = os.path.dirname(db_path)
 
@@ -49,148 +136,229 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+# ── Schema initialisation ──────────────────────────────────────
+
 def init_db():
     conn = get_connection()
 
     try:
         cursor = conn.cursor()
 
-        cursor.execute("PRAGMA journal_mode=WAL;")
-        cursor.execute("PRAGMA synchronous=NORMAL;")
-        cursor.execute("PRAGMA foreign_keys=ON;")
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                created_at_text TEXT,
-                mode TEXT,
-                source_lang TEXT,
-                target_lang TEXT,
-                native_lang TEXT,
-                persona TEXT,
-                ui_lang TEXT,
-                user_input TEXT,
-                ai_output TEXT,
-                tokens_input INTEGER,
-                tokens_output INTEGER,
-                model TEXT,
-                latency_ms INTEGER
-            );
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                password_salt TEXT NOT NULL,
-                created_at REAL NOT NULL,
-                last_login_at REAL
-            );
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS saved_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                item_type TEXT NOT NULL,
-                mode TEXT,
-                source_lang TEXT,
-                target_lang TEXT,
-                prompt TEXT,
-                content TEXT,
-                note TEXT,
-                reviewed_at REAL
-            );
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS vocab_items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                term TEXT NOT NULL,
-                meaning TEXT,
-                source_lang TEXT,
-                target_lang TEXT,
-                example TEXT,
-                strength INTEGER NOT NULL DEFAULT 1,
-                reviewed_at REAL
-            );
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS learning_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                event_type TEXT NOT NULL,
-                mode TEXT,
-                target_lang TEXT,
-                points INTEGER NOT NULL DEFAULT 1
-            );
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_history_user_time
-            ON history(username, timestamp DESC);
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_history_mode
-            ON history(mode);
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_history_langs
-            ON history(source_lang, target_lang);
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_saved_user_time
-            ON saved_items(username, timestamp DESC);
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_vocab_user_time
-            ON vocab_items(username, timestamp DESC);
-            """
-        )
-
-        cursor.execute(
-            """
-            CREATE INDEX IF NOT EXISTS idx_learning_user_time
-            ON learning_events(username, timestamp DESC);
-            """
-        )
+        if _use_postgres():
+            _init_postgres(cursor)
+        else:
+            _init_sqlite(cursor)
 
         conn.commit()
-
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
+
+def _init_sqlite(cursor):
+    """Create tables with SQLite-compatible DDL."""
+    cursor.execute("PRAGMA journal_mode=WAL;")
+    cursor.execute("PRAGMA synchronous=NORMAL;")
+    cursor.execute("PRAGMA foreign_keys=ON;")
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            created_at_text TEXT,
+            mode TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            native_lang TEXT,
+            persona TEXT,
+            ui_lang TEXT,
+            user_input TEXT,
+            ai_output TEXT,
+            tokens_input INTEGER,
+            tokens_output INTEGER,
+            model TEXT,
+            latency_ms INTEGER
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            created_at REAL NOT NULL,
+            last_login_at REAL
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS saved_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            item_type TEXT NOT NULL,
+            mode TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            prompt TEXT,
+            content TEXT,
+            note TEXT,
+            reviewed_at REAL
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vocab_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            term TEXT NOT NULL,
+            meaning TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            example TEXT,
+            strength INTEGER NOT NULL DEFAULT 1,
+            reviewed_at REAL
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS learning_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            timestamp REAL NOT NULL,
+            event_type TEXT NOT NULL,
+            mode TEXT,
+            target_lang TEXT,
+            points INTEGER NOT NULL DEFAULT 1
+        );
+        """
+    )
+
+    _execute_indices(cursor)
+
+
+def _init_postgres(cursor):
+    """Create tables with PostgreSQL-compatible DDL."""
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            password_salt TEXT NOT NULL,
+            created_at DOUBLE PRECISION NOT NULL,
+            last_login_at DOUBLE PRECISION
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS history (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            timestamp DOUBLE PRECISION NOT NULL,
+            created_at_text TEXT,
+            mode TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            native_lang TEXT,
+            persona TEXT,
+            ui_lang TEXT,
+            user_input TEXT,
+            ai_output TEXT,
+            tokens_input INTEGER,
+            tokens_output INTEGER,
+            model TEXT,
+            latency_ms INTEGER
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS saved_items (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            timestamp DOUBLE PRECISION NOT NULL,
+            item_type TEXT NOT NULL,
+            mode TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            prompt TEXT,
+            content TEXT,
+            note TEXT,
+            reviewed_at DOUBLE PRECISION
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vocab_items (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            timestamp DOUBLE PRECISION NOT NULL,
+            term TEXT NOT NULL,
+            meaning TEXT,
+            source_lang TEXT,
+            target_lang TEXT,
+            example TEXT,
+            strength INTEGER NOT NULL DEFAULT 1,
+            reviewed_at DOUBLE PRECISION
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS learning_events (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            timestamp DOUBLE PRECISION NOT NULL,
+            event_type TEXT NOT NULL,
+            mode TEXT,
+            target_lang TEXT,
+            points INTEGER NOT NULL DEFAULT 1
+        );
+        """
+    )
+
+    _execute_indices(cursor)
+
+
+def _execute_indices(cursor):
+    """Create indices — shared DDL between SQLite and PostgreSQL."""
+    p = _placeholder()
+    for sql in [
+        "CREATE INDEX IF NOT EXISTS idx_history_user_time ON history(username, timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_history_mode ON history(mode)",
+        "CREATE INDEX IF NOT EXISTS idx_history_langs ON history(source_lang, target_lang)",
+        "CREATE INDEX IF NOT EXISTS idx_saved_user_time ON saved_items(username, timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_vocab_user_time ON vocab_items(username, timestamp DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_learning_user_time ON learning_events(username, timestamp DESC)",
+    ]:
+        cursor.execute(sql)
+
+
+# ── Authentication (PBKDF2 — unchanged logic) ──────────────────
 
 def hash_password(password: str, salt: Optional[str] = None) -> Dict[str, str]:
     salt_value = salt or secrets.token_hex(16)
@@ -223,7 +391,7 @@ def create_user(username: str, password: str) -> Dict[str, Any]:
     try:
         cursor = conn.cursor()
         cursor.execute(
-            """
+            f"""
             INSERT INTO users (
                 username,
                 password_hash,
@@ -231,21 +399,35 @@ def create_user(username: str, password: str) -> Dict[str, Any]:
                 created_at,
                 last_login_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES ({_placeholder()}, {_placeholder()}, {_placeholder()}, {_placeholder()}, {_placeholder()})
             """,
             (
                 username_value,
                 password_data["hash"],
                 password_data["salt"],
-                time.time(),
-                time.time(),
+                _now_value(),
+                _now_value(),
             ),
         )
         conn.commit()
         return {"ok": True, "username": username_value}
 
     except sqlite3.IntegrityError:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         return {"ok": False, "error": "username_exists"}
+    except Exception as ex:
+        # Handle psycopg2.errors.UniqueViolation and fallback string check
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        err_str = str(ex).lower()
+        if "unique" in err_str or "integrity" in err_str:
+            return {"ok": False, "error": "username_exists"}
+        return {"ok": False, "error": "account_error"}
 
     finally:
         conn.close()
@@ -257,11 +439,12 @@ def authenticate_user(username: str, password: str) -> Dict[str, Any]:
 
     try:
         cursor = conn.cursor()
+        p = _placeholder()
         cursor.execute(
-            """
+            f"""
             SELECT username, password_hash, password_salt
             FROM users
-            WHERE username = ?
+            WHERE username = {p}
             """,
             (username_value,),
         )
@@ -276,22 +459,32 @@ def authenticate_user(username: str, password: str) -> Dict[str, Any]:
             return {"ok": False, "error": "invalid_credentials"}
 
         cursor.execute(
-            "UPDATE users SET last_login_at = ? WHERE username = ?",
-            (time.time(), username_value),
+            f"UPDATE users SET last_login_at = {p} WHERE username = {p}",
+            (_now_value(), username_value),
         )
         conn.commit()
 
         return {"ok": True, "username": row["username"]}
 
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
 
+# ── Schema migration helper (SQLite only) ──────────────────────
+
 def ensure_history_columns():
     """
-    Adds missing columns for older local databases.
-    SQLite has no simple ADD COLUMN IF NOT EXISTS, so inspect first.
+    Adds missing columns for older local databases (SQLite only).
+    PostgreSQL schema is always current after init_db().
     """
+    if _use_postgres():
+        return
 
     conn = get_connection()
 
@@ -304,10 +497,11 @@ def ensure_history_columns():
             cursor.execute("ALTER TABLE history ADD COLUMN created_at_text TEXT;")
 
         conn.commit()
-
     finally:
         conn.close()
 
+
+# ── History ────────────────────────────────────────────────────
 
 def insert_history(
     username: str,
@@ -328,14 +522,15 @@ def insert_history(
 
     try:
         cursor = conn.cursor()
-        now = time.time()
+        now = _now_value()
+        p = _placeholder()
         created_at_text = time.strftime(
             "%Y-%m-%d %H:%M:%S",
             time.localtime(now),
         )
 
         cursor.execute(
-            """
+            f"""
             INSERT INTO history (
                 username,
                 timestamp,
@@ -353,7 +548,7 @@ def insert_history(
                 model,
                 latency_ms
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
             """,
             (
                 username or "guest",
@@ -375,7 +570,12 @@ def insert_history(
         )
 
         conn.commit()
-
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -398,7 +598,8 @@ def fetch_history(
     persona: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    query = """
+    p = _placeholder()
+    query = f"""
         SELECT
             id,
             username,
@@ -417,33 +618,33 @@ def fetch_history(
             model,
             latency_ms
         FROM history
-        WHERE username = ?
+        WHERE username = {p}
     """
 
     params: List[Any] = [username or "guest"]
 
     if mode:
-        query += " AND mode = ?"
+        query += f" AND mode = {p}"
         params.append(mode)
 
     if source_lang:
-        query += " AND source_lang = ?"
+        query += f" AND source_lang = {p}"
         params.append(source_lang)
 
     if target_lang:
-        query += " AND target_lang = ?"
+        query += f" AND target_lang = {p}"
         params.append(target_lang)
 
     if persona:
-        query += " AND persona = ?"
+        query += f" AND persona = {p}"
         params.append(persona)
 
     if search:
-        query += " AND (user_input LIKE ? OR ai_output LIKE ?)"
+        query += f" AND (user_input LIKE {p} OR ai_output LIKE {p})"
         like_value = f"%{search}%"
         params.extend([like_value, like_value])
 
-    query += " ORDER BY timestamp DESC LIMIT ?"
+    query += f" ORDER BY timestamp DESC LIMIT {p}"
     params.append(normalize_limit(limit))
 
     conn = get_connection()
@@ -453,10 +654,11 @@ def fetch_history(
         cursor.execute(query, params)
 
         return [dict(row) for row in cursor.fetchall()]
-
     finally:
         conn.close()
 
+
+# ── Learning events ────────────────────────────────────────────
 
 def insert_learning_event(
     username: str,
@@ -469,8 +671,9 @@ def insert_learning_event(
 
     try:
         cursor = conn.cursor()
+        p = _placeholder()
         cursor.execute(
-            """
+            f"""
             INSERT INTO learning_events (
                 username,
                 timestamp,
@@ -479,11 +682,11 @@ def insert_learning_event(
                 target_lang,
                 points
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p})
             """,
             (
                 username or "guest",
-                time.time(),
+                _now_value(),
                 event_type or "activity",
                 mode or "",
                 target_lang or "",
@@ -491,44 +694,54 @@ def insert_learning_event(
             ),
         )
         conn.commit()
-
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
 
 def fetch_learning_summary(username: str, days: int = 7) -> Dict[str, Any]:
-    now = time.time()
+    now = _now_value()
     since = now - max(1, int(days or 7)) * 86400
     today_start = time.mktime(time.localtime(now)[:3] + (0, 0, 0, 0, 0, -1))
     conn = get_connection()
 
     try:
         cursor = conn.cursor()
+        p = _placeholder()
+
+        # Week aggregate
         cursor.execute(
-            """
+            f"""
             SELECT COUNT(*) AS count, COALESCE(SUM(points), 0) AS points
             FROM learning_events
-            WHERE username = ? AND timestamp >= ?
+            WHERE username = {p} AND timestamp >= {p}
             """,
             (username or "guest", since),
         )
         week = dict(cursor.fetchone())
 
+        # Today aggregate
         cursor.execute(
-            """
+            f"""
             SELECT COUNT(*) AS count, COALESCE(SUM(points), 0) AS points
             FROM learning_events
-            WHERE username = ? AND timestamp >= ?
+            WHERE username = {p} AND timestamp >= {p}
             """,
             (username or "guest", today_start),
         )
         today = dict(cursor.fetchone())
 
+        # Top mode
         cursor.execute(
-            """
+            f"""
             SELECT mode, COUNT(*) AS count
             FROM learning_events
-            WHERE username = ? AND timestamp >= ? AND mode != ''
+            WHERE username = {p} AND timestamp >= {p} AND mode != ''
             GROUP BY mode
             ORDER BY count DESC
             LIMIT 1
@@ -537,18 +750,32 @@ def fetch_learning_summary(username: str, days: int = 7) -> Dict[str, Any]:
         )
         top_mode = cursor.fetchone()
 
-        cursor.execute(
-            """
-            SELECT DISTINCT date(timestamp, 'unixepoch', 'localtime') AS day
-            FROM learning_events
-            WHERE username = ?
-            ORDER BY day DESC
-            LIMIT 30
-            """,
-            (username or "guest",),
-        )
-        active_days = [row["day"] for row in cursor.fetchall()]
+        # Active days for streak calculation
+        if _use_postgres():
+            cursor.execute(
+                f"""
+                SELECT DISTINCT to_timestamp(timestamp)::date AS day
+                FROM learning_events
+                WHERE username = {p}
+                ORDER BY day DESC
+                LIMIT 30
+                """,
+                (username or "guest",),
+            )
+        else:
+            cursor.execute(
+                f"""
+                SELECT DISTINCT date(timestamp, 'unixepoch', 'localtime') AS day
+                FROM learning_events
+                WHERE username = {p}
+                ORDER BY day DESC
+                LIMIT 30
+                """,
+                (username or "guest",),
+            )
+        active_days = [str(row["day"]) for row in cursor.fetchall()]
 
+        # Streak calculation (pure Python — same for both DBs)
         streak = 0
         cursor_day = time.strftime("%Y-%m-%d", time.localtime(now))
         active_set = set(active_days)
@@ -565,10 +792,11 @@ def fetch_learning_summary(username: str, days: int = 7) -> Dict[str, Any]:
             "top_mode": top_mode["mode"] if top_mode else "-",
             "streak": streak,
         }
-
     finally:
         conn.close()
 
+
+# ── Saved items (review book) ──────────────────────────────────
 
 def add_saved_item(
     username: str,
@@ -584,8 +812,8 @@ def add_saved_item(
 
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
+        p = _placeholder()
+        sql = f"""
             INSERT INTO saved_items (
                 username,
                 timestamp,
@@ -597,23 +825,37 @@ def add_saved_item(
                 content,
                 note
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                username or "guest",
-                time.time(),
-                item_type or "review",
-                mode or "",
-                source_lang or "",
-                target_lang or "",
-                prompt or "",
-                content or "",
-                note or "",
-            ),
-        )
-        conn.commit()
-        return int(cursor.lastrowid)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p}, {p}, {p})
+        """
 
+        params = (
+            username or "guest",
+            _now_value(),
+            item_type or "review",
+            mode or "",
+            source_lang or "",
+            target_lang or "",
+            prompt or "",
+            content or "",
+            note or "",
+        )
+
+        if _use_postgres():
+            cursor.execute(sql + " RETURNING id", params)
+            row = cursor.fetchone()
+            row_id = int(row["id"])
+        else:
+            cursor.execute(sql, params)
+            row_id = int(cursor.lastrowid)
+
+        conn.commit()
+        return row_id
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -624,24 +866,25 @@ def fetch_saved_items(
     item_type: Optional[str] = None,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    query = """
+    p = _placeholder()
+    query = f"""
         SELECT id, username, timestamp, item_type, mode, source_lang,
                target_lang, prompt, content, note, reviewed_at
         FROM saved_items
-        WHERE username = ?
+        WHERE username = {p}
     """
     params: List[Any] = [username or "guest"]
 
     if item_type:
-        query += " AND item_type = ?"
+        query += f" AND item_type = {p}"
         params.append(item_type)
 
     if search:
-        query += " AND (prompt LIKE ? OR content LIKE ? OR note LIKE ?)"
+        query += f" AND (prompt LIKE {p} OR content LIKE {p} OR note LIKE {p})"
         like_value = f"%{search}%"
         params.extend([like_value, like_value, like_value])
 
-    query += " ORDER BY timestamp DESC LIMIT ?"
+    query += f" ORDER BY timestamp DESC LIMIT {p}"
     params.append(normalize_limit(limit))
 
     conn = get_connection()
@@ -650,10 +893,11 @@ def fetch_saved_items(
         cursor = conn.cursor()
         cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
-
     finally:
         conn.close()
 
+
+# ── Vocab items ────────────────────────────────────────────────
 
 def add_vocab_item(
     username: str,
@@ -667,8 +911,8 @@ def add_vocab_item(
 
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            """
+        p = _placeholder()
+        sql = f"""
             INSERT INTO vocab_items (
                 username,
                 timestamp,
@@ -678,21 +922,35 @@ def add_vocab_item(
                 target_lang,
                 example
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                username or "guest",
-                time.time(),
-                (term or "").strip()[:200],
-                meaning or "",
-                source_lang or "",
-                target_lang or "",
-                example or "",
-            ),
-        )
-        conn.commit()
-        return int(cursor.lastrowid)
+            VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})
+        """
 
+        params = (
+            username or "guest",
+            _now_value(),
+            (term or "").strip()[:200],
+            meaning or "",
+            source_lang or "",
+            target_lang or "",
+            example or "",
+        )
+
+        if _use_postgres():
+            cursor.execute(sql + " RETURNING id", params)
+            row = cursor.fetchone()
+            row_id = int(row["id"])
+        else:
+            cursor.execute(sql, params)
+            row_id = int(cursor.lastrowid)
+
+        conn.commit()
+        return row_id
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
     finally:
         conn.close()
 
@@ -702,20 +960,21 @@ def fetch_vocab_items(
     limit: int = 80,
     search: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
-    query = """
+    p = _placeholder()
+    query = f"""
         SELECT id, username, timestamp, term, meaning, source_lang,
                target_lang, example, strength, reviewed_at
         FROM vocab_items
-        WHERE username = ?
+        WHERE username = {p}
     """
     params: List[Any] = [username or "guest"]
 
     if search:
-        query += " AND (term LIKE ? OR meaning LIKE ? OR example LIKE ?)"
+        query += f" AND (term LIKE {p} OR meaning LIKE {p} OR example LIKE {p})"
         like_value = f"%{search}%"
         params.extend([like_value, like_value, like_value])
 
-    query += " ORDER BY timestamp DESC LIMIT ?"
+    query += f" ORDER BY timestamp DESC LIMIT {p}"
     params.append(normalize_limit(limit))
 
     conn = get_connection()
@@ -724,6 +983,5 @@ def fetch_vocab_items(
         cursor = conn.cursor()
         cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
-
     finally:
         conn.close()

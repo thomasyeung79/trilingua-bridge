@@ -525,3 +525,17 @@ def test_login_normalizes_username():
         conn.close()
 
 
+# ── PostgreSQL schema init safety ────────────────────────────
+
+def test_pg_schema_init_has_advisory_lock():
+    """_init_postgres must use pg_advisory_xact_lock for concurrent-instance safety."""
+    with open("db_helper.py", encoding="utf-8") as f:
+        content = f.read()
+    assert "def _init_postgres" in content
+    # Locate the function body
+    start = content.index("def _init_postgres")
+    body = content[start:start + 2000]  # first 2000 chars of the function
+    assert "pg_advisory_xact_lock" in body, "Missing pg_advisory_xact_lock in _init_postgres"
+    assert "trilingua_schema_init" in body, "Missing lock key in _init_postgres"
+
+

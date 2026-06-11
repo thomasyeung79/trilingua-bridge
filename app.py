@@ -106,12 +106,24 @@ inject_product_css()
 
 init_state()
 
-# ── Database ─────────────────────────────────────
-try:
+# ── Database (cached — runs once per server process, not on every rerun) ──
+@st.cache_resource
+def _init_db_once():
+    """Initialise database tables. Cache ensures this runs only once per server process."""
     init_db()
     ensure_history_columns()
-except Exception as e:
-    st.warning(f"{t('db_init_failed')}: {e}")
+    return True
+
+try:
+    _init_db_once()
+except Exception:
+    st.error(t("db_init_failed"))
+    try:
+        from error_monitor import capture_error
+        capture_error("Database init failed at startup")
+    except Exception:
+        pass
+    st.stop()
 
 # ── Demo mode banner ─────────────────────────────
 if is_demo_mode():

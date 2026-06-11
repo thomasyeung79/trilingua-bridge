@@ -275,6 +275,8 @@ def _init_sqlite(cursor):
 
 def _init_postgres(cursor):
     """Create tables with PostgreSQL-compatible DDL."""
+    # Acquire transaction-scoped advisory lock for concurrent-instance safety
+    cursor.execute("SELECT pg_advisory_xact_lock(hashtext('trilingua_schema_init'))")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users (

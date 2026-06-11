@@ -7,6 +7,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 try:
+    from error_monitor import capture_error
+except Exception:
+    def capture_error(*args, **kwargs): pass  # no-op fallback
+
+try:
     from anthropic import Anthropic
     HAVE_ANTHROPIC = True
 except Exception:
@@ -646,6 +651,11 @@ def call_json_chat(
     except Exception as e:
         deepseek_error = str(e)
 
+        capture_error(
+            "ai_provider_failure",
+            extra={"stage": "json", "providers": "openai,anthropic,deepseek"},
+        )
+
         return (
             {
                 "mock": True,
@@ -703,6 +713,10 @@ def call_plain_chat(
     try:
         return _call_deepseek_plain(model, system_prompt, user_prompt, temperature)
     except Exception as e:
+        capture_error(
+            "ai_provider_failure",
+            extra={"stage": "plain", "providers": "openai,anthropic,deepseek"},
+        )
         return (
             f"All providers failed.\nOpenAI: {openai_error}\nAnthropic: {anthropic_error}\nDeepSeek: {e}",
             mock_usage(model),

@@ -20,5 +20,8 @@ pykakasi>=2.2
 streamlit-mic-recorder>=0.0.8   # in-browser microphone capture
 pycantonese>=4.0.0              # Jyutping romanization for Cantonese
 
+# Error monitoring (optional — only needed when SENTRY_DSN is configured)
+sentry-sdk>=2.0
+
 # PostgreSQL / Supabase (optional — only needed when USE_POSTGRES=true)
 psycopg2-binary>=2.9

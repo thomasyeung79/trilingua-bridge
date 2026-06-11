@@ -8,6 +8,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 
+from error_monitor import init_monitoring
 from ui_helper import inject_css, t, TEXTS
 from db_helper import init_db, ensure_history_columns
 from modules.styles import inject_product_css
@@ -32,6 +33,9 @@ from modules.pages import (
 
 load_dotenv()
 
+# ── Sentry error monitoring (optional, graceful if not configured) ──
+init_monitoring()
+# ── end Sentry ──
 
 # ── PWA injection ─────────────────────────────────
 def inject_pwa_tags():

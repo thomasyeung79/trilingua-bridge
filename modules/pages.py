@@ -6,6 +6,7 @@ import io
 import csv
 import json
 import os
+import secrets
 import time
 from typing import Dict, Any, Callable, Optional
 
@@ -43,6 +44,7 @@ from db_helper import (
     fetch_saved_items,
     add_vocab_item,
     fetch_vocab_items,
+    reserve_daily_usage,
 )
 
 from ai_helper import (
@@ -206,6 +208,10 @@ def filter_lang_label(value: str) -> str:
 # ═══════════════════════════════════════════════════
 
 def init_state():
+    # Persistent guest identifier for quota tracking (not shared across guests)
+    if "guest_id" not in st.session_state:
+        st.session_state.guest_id = "guest_" + secrets.token_urlsafe(16)
+
     defaults = {
         "ui_lang": "en",
         "page": "Home",
@@ -595,6 +601,19 @@ def run_ai_task(
     history_kwargs: Dict[str, Any],
     pron_lang: Optional[str] = None,
 ):
+    # ── Reserve AI request quota atomically ──
+    # Quota counts AI actions per day (one action = one Coach/Translate/etc run).
+    # Secondary analysis (e.g. naturalness evaluation) runs within the same action.
+    _raw_username = history_kwargs.get("username", "guest")
+    _is_guest = st.session_state.get("auth_mode") != "password"
+    _quota_username = st.session_state.get("guest_id", "guest") if _is_guest else _raw_username
+    _allowed, _remaining = reserve_daily_usage(_quota_username, is_guest=_is_guest)
+    if not _allowed:
+        _msg = t("quota_guest_limit") if _is_guest else t("quota_user_limit")
+        st.warning(_msg)
+        return None
+    # ── end quota check (quota already consumed by reserve) ──
+
     start = time.perf_counter()
 
     try:
@@ -1858,20 +1877,23 @@ def render_mean_coach_kpop_page(page: str):
                         st.session_state.coach_conversation.pop(0)
             # ── end conversation memory append ──
 
-            try:
-                detected_code = detect_language_code(text, st.session_state.model_input, st.session_state.temperature, persona_profile) or source_choice
-                if detected_code in ("zh", "yue", "ko", "ja", "en"):
-                    eval_data = evaluate_naturalness(
-                        sentence=text, eval_lang=detected_code, native_lang=st.session_state.native_lang,
-                        model=st.session_state.model_input, temperature=st.session_state.temperature,
-                        persona_profile=persona_profile,
-                    )
-                    render_naturalness_panel(
-                        TEXTS.get(st.session_state.ui_lang, {}).get("naturalness_score_title", "Naturalness Score"),
-                        eval_data,
-                    )
-            except Exception:
-                pass
+            # ── Secondary AI analysis (only runs after successful primary call) ──
+            if result_pair is not None:
+                try:
+                    detected_code = detect_language_code(text, st.session_state.model_input, st.session_state.temperature, persona_profile) or source_choice
+                    if detected_code in ("zh", "yue", "ko", "ja", "en"):
+                        eval_data = evaluate_naturalness(
+                            sentence=text, eval_lang=detected_code, native_lang=st.session_state.native_lang,
+                            model=st.session_state.model_input, temperature=st.session_state.temperature,
+                            persona_profile=persona_profile,
+                        )
+                        render_naturalness_panel(
+                            TEXTS.get(st.session_state.ui_lang, {}).get("naturalness_score_title", "Naturalness Score"),
+                            eval_data,
+                        )
+                except Exception:
+                    pass
+            # ── end secondary AI ──
 
         elif page == "Mean":
             persona_profile = get_persona_profile(source_choice, st.session_state.native_lang)
@@ -2014,7 +2036,7 @@ def render_natural_page():
             st.warning(t("enter_text_warn"))
         else:
             persona_profile = get_persona_profile(st.session_state.target_lang, st.session_state.target_lang)
-            run_ai_task(
+            _nat_result = run_ai_task(
                 task_fn=suggest_natural_expression,
                 task_kwargs=dict(
                     text=text, target_lang=st.session_state.target_lang,
@@ -2030,19 +2052,21 @@ def render_natural_page():
                 ),
                 pron_lang=st.session_state.target_lang,
             )
-            try:
-                eval_data = evaluate_naturalness(
-                    sentence=text, eval_lang=st.session_state.target_lang,
-                    native_lang=st.session_state.native_lang,
-                    model=st.session_state.model_input, temperature=st.session_state.temperature,
-                    persona_profile=persona_profile,
-                )
-                render_naturalness_panel(
-                    TEXTS.get(st.session_state.ui_lang, {}).get("naturalness_score_title", "Naturalness Score"),
-                    eval_data,
-                )
-            except Exception:
-                pass
+            # Secondary analysis only runs after successful primary AI call
+            if _nat_result is not None:
+                try:
+                    eval_data = evaluate_naturalness(
+                        sentence=text, eval_lang=st.session_state.target_lang,
+                        native_lang=st.session_state.native_lang,
+                        model=st.session_state.model_input, temperature=st.session_state.temperature,
+                        persona_profile=persona_profile,
+                    )
+                    render_naturalness_panel(
+                        TEXTS.get(st.session_state.ui_lang, {}).get("naturalness_score_title", "Naturalness Score"),
+                        eval_data,
+                    )
+                except Exception:
+                    pass
 
 
 # ═══════════════════════════════════════════════════

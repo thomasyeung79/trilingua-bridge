@@ -65,3 +65,12 @@ def test_all_locales_have_swap_unavailable_auto():
     for lang in LOCALES:
         assert "swap_unavailable_auto" in TEXTS[lang], f"{lang}: missing swap_unavailable_auto"
         assert len(TEXTS[lang]["swap_unavailable_auto"]) > 0, f"{lang}: swap_unavailable_auto is empty"
+
+
+def test_all_locales_have_quota_limit_keys():
+    """quota_guest_limit and quota_user_limit must exist in every UI language."""
+    for lang in LOCALES:
+        assert "quota_guest_limit" in TEXTS[lang], f"{lang}: missing quota_guest_limit"
+        assert len(TEXTS[lang]["quota_guest_limit"]) > 0, f"{lang}: quota_guest_limit is empty"
+        assert "quota_user_limit" in TEXTS[lang], f"{lang}: missing quota_user_limit"
+        assert len(TEXTS[lang]["quota_user_limit"]) > 0, f"{lang}: quota_user_limit is empty"

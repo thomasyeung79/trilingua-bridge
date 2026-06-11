@@ -6,6 +6,11 @@ import hmac
 import secrets
 from typing import Optional, List, Dict, Any
 
+try:
+    from error_monitor import capture_error
+except Exception:
+    def capture_error(*args, **kwargs): pass  # no-op fallback
+
 
 # ── Dual-mode helpers ─────────────────────────────────────────
 
@@ -251,6 +256,20 @@ def _init_sqlite(cursor):
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            date TEXT NOT NULL,
+            ai_requests INTEGER NOT NULL DEFAULT 0,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            UNIQUE(username, date)
+        );
+        """
+    )
+
     _execute_indices(cursor)
 
 
@@ -341,6 +360,20 @@ def _init_postgres(cursor):
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS daily_usage (
+            id BIGSERIAL PRIMARY KEY,
+            username TEXT NOT NULL,
+            date TEXT NOT NULL,
+            ai_requests INTEGER NOT NULL DEFAULT 0,
+            created_at DOUBLE PRECISION NOT NULL,
+            updated_at DOUBLE PRECISION NOT NULL,
+            UNIQUE(username, date)
+        );
+        """
+    )
+
     _execute_indices(cursor)
 
 
@@ -375,12 +408,18 @@ def hash_password(password: str, salt: Optional[str] = None) -> Dict[str, str]:
     }
 
 
+_RESERVED_USERNAMES = {"guest", "admin", "system", "anonymous", "support"}
+
+
 def create_user(username: str, password: str) -> Dict[str, Any]:
-    username_value = (username or "").strip()
+    username_value = (username or "").strip().lower()
     password_value = password or ""
 
     if len(username_value) < 2:
         return {"ok": False, "error": "username_too_short"}
+
+    if username_value in _RESERVED_USERNAMES:
+        return {"ok": False, "error": "username_exists"}
 
     if len(password_value) < 6:
         return {"ok": False, "error": "password_too_short"}
@@ -434,7 +473,7 @@ def create_user(username: str, password: str) -> Dict[str, Any]:
 
 
 def authenticate_user(username: str, password: str) -> Dict[str, Any]:
-    username_value = (username or "").strip()
+    username_value = (username or "").strip().lower()
     conn = get_connection()
 
     try:
@@ -983,5 +1022,144 @@ def fetch_vocab_items(
         cursor = conn.cursor()
         cursor.execute(query, params)
         return [dict(row) for row in cursor.fetchall()]
+    finally:
+        conn.close()
+
+
+# ── Daily usage quota ──────────────────────────────────────────
+
+# Quota counts AI actions per day (one action = one Coach/Translate/etc run).
+# Secondary analysis (naturalness, detection) runs within the same action.
+# Quota is consumed at reservation time, not per provider API call.
+# Guest quota uses a persistent per-session guest_id (unique per visitor).
+# Guest quota is per Streamlit session. Closing browser or new incognito
+# creates a new guest identity. Logged-in users have stable daily quota.
+_DAILY_LIMIT_GUEST = 5
+_DAILY_LIMIT_USER = 30
+
+
+def _quota_limit(is_guest: bool) -> int:
+    """Return the daily AI action limit for guest or logged-in users."""
+    return _DAILY_LIMIT_GUEST if is_guest else _DAILY_LIMIT_USER
+
+
+def reserve_daily_usage(username: str, is_guest: bool = False) -> tuple:
+    """
+    Atomically reserve one AI request for the user.
+
+    Args:
+        username: User identifier for quota tracking.
+        is_guest: True for guest visitors (limit=5), False for logged-in (limit=30).
+
+    PostgreSQL: uses INSERT ... ON CONFLICT DO UPDATE ... WHERE ... RETURNING
+    which is a single atomic SQL statement — no race possible.
+
+    SQLite: uses BEGIN IMMEDIATE + read-check-write within a transaction.
+    SQLite serialises writes, so this is safe.
+
+    Returns (allowed: bool, remaining_after: int).
+    On database error, returns (False, 0) to fail closed.
+    """
+    today = time.strftime("%Y-%m-%d")
+    now = _now_value()
+    max_req = _quota_limit(is_guest)
+    p = _placeholder()
+    conn = None
+
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        if _use_postgres():
+            # ── PostgreSQL: single atomic upsert with conditional WHERE ──
+            cursor.execute(
+                f"""
+                INSERT INTO daily_usage (username, date, ai_requests, created_at, updated_at)
+                VALUES ({p}, {p}, 1, {p}, {p})
+                ON CONFLICT (username, date) DO UPDATE SET
+                    ai_requests = daily_usage.ai_requests + 1,
+                    updated_at = {p}
+                WHERE daily_usage.ai_requests < {p}
+                RETURNING ai_requests
+                """,
+                (username or "guest", today, now, now, now, max_req),
+            )
+            row = cursor.fetchone()
+            conn.commit()
+
+            if row:
+                cur = row["ai_requests"]
+                allowed = True
+                remaining = max(0, max_req - cur)
+            else:
+                # No row returned = WHERE condition failed (quota reached)
+                allowed = False
+                remaining = 0
+
+        else:
+            # ── SQLite: transaction with read-check-write ──
+            cursor.execute("BEGIN IMMEDIATE")
+            cursor.execute(
+                f"""SELECT ai_requests FROM daily_usage WHERE username = {p} AND date = {p}""",
+                (username or "guest", today),
+            )
+            row = cursor.fetchone()
+            current = row["ai_requests"] if row else 0
+            allowed = current < max_req
+
+            if allowed:
+                if row:
+                    cursor.execute(
+                        f"""UPDATE daily_usage SET ai_requests = ai_requests + 1, updated_at = {p}
+                            WHERE username = {p} AND date = {p}""",
+                        (now, username or "guest", today),
+                    )
+                else:
+                    cursor.execute(
+                        f"""INSERT INTO daily_usage (username, date, ai_requests, created_at, updated_at)
+                            VALUES ({p}, {p}, 1, {p}, {p})""",
+                        (username or "guest", today, now, now),
+                    )
+            conn.commit()
+
+            remaining = max(0, max_req - (current + 1 if allowed else current))
+
+        return (allowed, remaining)
+
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        # Fail closed: quota error should not allow unbounded AI calls
+        capture_error("quota_reservation_failed")
+        return (False, 0)
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def get_daily_usage_remaining(username: str, is_guest: bool = False) -> int:
+    """Get the number of remaining AI requests for today for the given user.
+
+    Args:
+        username: User identifier for quota tracking.
+        is_guest: True for guest visitors (limit=5), False for logged-in (limit=30).
+    """
+    today = time.strftime("%Y-%m-%d")
+    max_requests = _quota_limit(is_guest)
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        p = _placeholder()
+        cursor.execute(
+            f"""SELECT ai_requests FROM daily_usage WHERE username = {p} AND date = {p}""",
+            (username or "guest", today),
+        )
+        row = cursor.fetchone()
+        current = row["ai_requests"] if row else 0
+        return max(0, max_requests - current)
     finally:
         conn.close()

@@ -107,8 +107,6 @@ TriLingua Bridge answers that question by combining:
 
 ## 📸 Screenshots
 
-<!-- TODO: Add screenshots of the following pages -->
-
 | Coach Page | Translate | History |
 |-----------|-----------|---------|
 | ![Coach](docs/screenshots/coach.png) | ![Translate](docs/screenshots/translate.png) | ![History](docs/screenshots/history.png) |

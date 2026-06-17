@@ -1016,6 +1016,7 @@ def render_workspace_home(username: str):
             unsafe_allow_html=True,
         )
         workspace_nav_button(ui_text("feature_course", "Course Learning"), "Lessons", "nav_lessons")
+        workspace_nav_button(ui_text("recommendations_nav", "Recommendations"), "Recommendations", "nav_recommendations")
         workspace_nav_button(ui_text("review_book", "Review Book"), "Review", "nav_review")
         workspace_nav_button(ui_text("vocab_bank", "Vocab Bank"), "Vocab Bank", "nav_vocab_bank")
         workspace_nav_button(ui_text("learning_report", "Learning Report"), "Report", "nav_report")
@@ -2274,3 +2275,101 @@ def render_about_page():
     go_home_button()
     section_header(t("about_title"))
     st.write(t("about_desc"))
+
+
+# ═══════════════════════════════════════════════════
+# Recommendations page
+# ═══════════════════════════════════════════════════
+
+def render_recommendations_page(username: str):
+    go_home_button()
+    section_header(
+        ui_text("recommendations_title", "AI Feature Recommendations"),
+        ui_text("recommendations_sub", "Personalised suggestions based on your language goals and activity."),
+    )
+
+    from recommendation_engine import get_recommendations
+    from db_helper import fetch_history, fetch_vocab_items
+
+    target_lang = st.session_state.get("target_lang", "ko")
+    native_lang = st.session_state.get("native_lang", "zh")
+    show_pron = st.session_state.get("show_pron", False)
+
+    # Gather usage data for the engine
+    try:
+        history = fetch_history(username=username, limit=200)
+    except Exception:
+        history = []
+
+    mode_counts: Dict[str, int] = {}
+    for row in history:
+        mode = row.get("mode", "")
+        if mode:
+            mode_counts[mode] = mode_counts.get(mode, 0) + 1
+
+    try:
+        vocab_items = fetch_vocab_items(username=username, limit=200)
+        vocab_count = len(vocab_items)
+    except Exception:
+        vocab_count = 0
+
+    recommendations = get_recommendations(
+        username=username,
+        native_lang=native_lang,
+        target_lang=target_lang,
+        mode_counts=mode_counts,
+        vocab_item_count=vocab_count,
+        show_pron=show_pron,
+    )
+
+    if not recommendations:
+        st.info(ui_text("recommendations_empty", "Complete a few tasks first, then come back for personalised recommendations."))
+        return
+
+    # ── Top pick banner ──
+    top = recommendations[0]
+    st.markdown(
+        f"""
+        <div style="border:1px solid #2563eb20;border-radius:8px;background:linear-gradient(135deg,#eef5ff,#ecfdf5);padding:1.25rem;margin-bottom:1.25rem;">
+            <div style="color:#2563eb;font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">{ui_text("recommendations_top_pick", "Top pick")}</div>
+            <div style="font-size:1.35rem;font-weight:800;margin:0.3rem 0;">{top["icon"]} {top["name"]}</div>
+            <div style="color:#4b5563;margin-bottom:0.6rem;">{top["description"]}</div>
+            <div style="margin-bottom:0.6rem;">
+                <span style="background:#2563eb;color:white;border-radius:4px;padding:0.15rem 0.5rem;font-size:0.78rem;font-weight:700;">
+                    {ui_text("recommendations_score", "Match")}: {top["score"]}
+                </span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    if st.button(
+        f"{ui_text('recommendations_try', 'Try')} →",
+        key=f"rec_try_top_{top['id']}",
+        use_container_width=True,
+    ):
+        st.session_state.page = top["page"]
+        st.rerun()
+
+    # ── Remaining recommendations ──
+    for rec in recommendations[1:]:
+        with st.container(border=True):
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.markdown(f"**{rec['icon']} {rec['name']}**")
+                st.caption(rec["description"])
+                score_pct = int(rec["score"] * 100)
+                st.progress(score_pct / 100.0, text=f"{ui_text('recommendations_score', 'Match')}: {score_pct}%")
+            with col2:
+                if st.button(
+                    f"{ui_text('recommendations_try', 'Try')} →",
+                    key=f"rec_try_{rec['id']}",
+                    use_container_width=True,
+                ):
+                    st.session_state.page = rec["page"]
+                    st.rerun()
+
+    st.divider()
+    st.caption(
+        ui_text("recommendations_feedback", "Recommendations update as you use more features. Check back after trying something new.")
+    )

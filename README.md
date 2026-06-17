@@ -86,6 +86,19 @@ TriLingua Bridge answers that question by combining:
 - **Text-to-speech** via OpenAI TTS or gTTS
 - **Romanization**: Pinyin, Jyutping, Hangul romaji, Japanese Hepburn, IPA
 
+### 🎯 Personalized Recommendations
+- AI-driven feature suggestions based on your language goals, learning preferences, and usage patterns
+- Scoring formula: Language Goal × 0.50 + Preference × 0.30 + Activity × 0.20
+- Intelligent rules:
+  - **Korean learners** → K-pop / Drama Context
+  - **Frequent translators** → AI Chat Coach
+  - **Vocabulary-focused users** → Vocab Builder
+  - **Voice/TTS users** → Pronunciation Guide
+  - **Grammar power users** → Natural Expression
+  - **Chat Coach regulars** → Conversation Memory Coach
+- Top 3 recommendations displayed with match scores and "Try" buttons
+- Available from the Workspace navigation
+
 ### 📚 Workspace
 - **Review Book** — save AI outputs as spaced-revision cards
 - **Vocab Bank** — personal phrase collection with examples
@@ -114,6 +127,10 @@ TriLingua Bridge answers that question by combining:
 | Review Book | Vocab Bank | Learning Report |
 |------------|-----------|----------------|
 | ![Review](docs/screenshots/review.png) | ![Vocab](docs/screenshots/vocab.png) | ![Report](docs/screenshots/report.png) |
+
+| Recommendations | | |
+|-----------------|---|---|
+| ![Recommendations](docs/screenshots/recommendations.png) | | |
 
 ---
 

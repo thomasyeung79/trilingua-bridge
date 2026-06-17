@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - Unreleased
+
+### Added
+- AI-powered feature recommendation engine
+- Personalized recommendations based on language goals, preferences, and user activity
+- New Recommendations page (accessible from Workspace navigation)
+- Top 3 personalized feature suggestions with match scores
+- 24 unit tests for recommendation scoring
+
+### Internal
+- New module: `recommendation_engine.py` — scoring engine with 3-component formula (Goal × 0.50 + Preference × 0.30 + Activity × 0.20)
+- New page route: `modules/pages.py` renders the Recommendations page
+- 8 feature catalogue entries covering all major AI tools
+- No new dependencies, no database migrations
+
+---
+
 ## [2.0.0] - 2026-06-11
 
 ### Added
@@ -156,7 +173,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/thomasyeung79/trilingua-bridge/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/thomasyeung79/trilingua-bridge/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/thomasyeung79/trilingua-bridge/releases/tag/v2.1.0
 [2.0.0]: https://github.com/thomasyeung79/trilingua-bridge/releases/tag/v2.0.0
 [1.3.0]: https://github.com/thomasyeung79/trilingua-bridge/releases/tag/v1.3.0
 [1.2.0]: https://github.com/thomasyeung79/trilingua-bridge/releases/tag/v1.2.0

@@ -29,6 +29,7 @@ from modules.pages import (
     render_tone_page,
     render_history_page,
     render_about_page,
+    render_recommendations_page,
 )
 
 load_dotenv()
@@ -181,5 +182,8 @@ elif page == "History":
 
 elif page == "About":
     render_about_page()
+
+elif page == "Recommendations":
+    render_recommendations_page(username)
 
 st.caption("© 2026 TriLingua Bridge")

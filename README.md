@@ -12,8 +12,7 @@
 
 <p align="center">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/stable-v2.0.0-blueviolet" alt="Latest stable release v2.0.0"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/development-v2.1.0-orange" alt="Current development version v2.1.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/release-v2.1.0-blueviolet" alt="Current release v2.1.0"></a>
   <img src="https://img.shields.io/badge/streamlit-1.33%2B-ff4b4b" alt="Streamlit">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome">
@@ -31,9 +30,8 @@
 
 ## Release Status
 
-- Latest stable release: v2.0.0
-- Current development version: v2.1.0
-- Status: Active development
+- Current portfolio release: v2.1.0
+- Status: Release candidate for portfolio review
 
 ---
 

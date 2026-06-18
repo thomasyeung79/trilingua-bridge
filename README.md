@@ -12,7 +12,8 @@
 
 <p align="center">
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"></a>
-  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-2.0.0-blueviolet" alt="Version 2.0.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/stable-v2.0.0-blueviolet" alt="Latest stable release v2.0.0"></a>
+  <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/development-v2.1.0-orange" alt="Current development version v2.1.0"></a>
   <img src="https://img.shields.io/badge/streamlit-1.33%2B-ff4b4b" alt="Streamlit">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs welcome">
@@ -28,14 +29,22 @@
 
 ---
 
+## Release Status
+
+- Latest stable release: v2.0.0
+- Current development version: v2.1.0
+- Status: Active development
+
+---
+
 ## 📖 Overview
 
 TriLingua Bridge helps language learners write natural, culturally appropriate messages across **Mandarin Chinese, Cantonese, Korean, Japanese, and English**.
 
 It is not a translation tool. It is a **communication coach**: you describe the situation, and it helps you craft a reply that sounds natural — with tone analysis, cultural notes, pronunciation guides, and vocabulary explanations built in.
 
-**Live demo:** [streamlit.app link — coming soon]  
-**Demo video:** [2-minute walkthrough — coming soon]
+**Live demo:** Demo available upon request
+**Demo video:** Demo available upon request
 
 ---
 
@@ -383,11 +392,13 @@ pytest --cov=. tests/
 
 *Integration tests (AI mocking, database) are planned — see [Roadmap](#-roadmap).*
 
+**CI visibility:** `.github/` is intentionally excluded from the public repository because pushing workflow files requires a GitHub token with `workflow` scope. Automated checks are currently run locally with `pytest` and Ruff before release commits.
+
 ---
 
 ## 🗺️ Roadmap
 
-### v2.0 (current)
+### v2.0 (latest stable)
 - ✅ Japanese language support
 - ✅ Anthropic Claude AI provider
 - ✅ PWA support (manifest, service worker, offline fallback)
@@ -395,7 +406,8 @@ pytest --cov=. tests/
 - ✅ Quick Language Swap
 - ✅ Multi-region coaching (CN / HK / KR / JP / AU / US)
 
-### v2.1 (next)
+### v2.1.0 (development)
+- ✅ Personalized feature recommendations
 - ⬜ Unified Coach page (merge Mean/Tone/Kpop into a single coaching workflow)
 - ⬜ Pre-built example scenarios for cold-start coaching
 - ⬜ Coach history grouped by conversation session
@@ -410,7 +422,7 @@ pytest --cov=. tests/
 - ⬜ Extract inline CSS to static stylesheet
 - ⬜ Add mypy type checking
 - ⬜ Increase test coverage (>30%)
-- ⬜ CI pipeline (GitHub Actions) — requires PAT with `workflow` scope
+- ⬜ Public CI pipeline (GitHub Actions) — local checks run before release commits
 
 ---
 

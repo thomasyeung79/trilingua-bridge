@@ -74,3 +74,37 @@ def test_all_locales_have_quota_limit_keys():
         assert len(TEXTS[lang]["quota_guest_limit"]) > 0, f"{lang}: quota_guest_limit is empty"
         assert "quota_user_limit" in TEXTS[lang], f"{lang}: missing quota_user_limit"
         assert len(TEXTS[lang]["quota_user_limit"]) > 0, f"{lang}: quota_user_limit is empty"
+
+
+def test_all_locales_have_recommendation_keys():
+    """Recommendation navigation/page/card labels must exist in every UI language."""
+    base_keys = [
+        "recommendations_nav",
+        "recommendations_title",
+        "recommendations_sub",
+        "recommendations_top_pick",
+        "recommendations_score",
+        "recommendations_try",
+        "recommendations_empty",
+        "recommendations_feedback",
+    ]
+    feature_ids = [
+        "coach",
+        "pronunciation",
+        "grammar",
+        "natural",
+        "tone",
+        "vocab",
+        "kpop",
+        "conversation_memory",
+    ]
+    feature_keys = [
+        f"recommendation_{feature_id}_{field}"
+        for feature_id in feature_ids
+        for field in ("name", "desc")
+    ]
+
+    for lang in LOCALES:
+        for key in base_keys + feature_keys:
+            assert key in TEXTS[lang], f"{lang}: missing {key}"
+            assert TEXTS[lang][key], f"{lang}: {key} is empty"

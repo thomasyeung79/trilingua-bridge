@@ -2326,14 +2326,22 @@ def render_recommendations_page(username: str):
         st.info(ui_text("recommendations_empty", "Complete a few tasks first, then come back for personalised recommendations."))
         return
 
+    def recommendation_name(rec: Dict[str, Any]) -> str:
+        return ui_text(f"recommendation_{rec['id']}_name", rec["name"])
+
+    def recommendation_description(rec: Dict[str, Any]) -> str:
+        return ui_text(f"recommendation_{rec['id']}_desc", rec["description"])
+
     # ── Top pick banner ──
     top = recommendations[0]
+    top_name = recommendation_name(top)
+    top_description = recommendation_description(top)
     st.markdown(
         f"""
         <div style="border:1px solid #2563eb20;border-radius:8px;background:linear-gradient(135deg,#eef5ff,#ecfdf5);padding:1.25rem;margin-bottom:1.25rem;">
             <div style="color:#2563eb;font-size:0.78rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;">{ui_text("recommendations_top_pick", "Top pick")}</div>
-            <div style="font-size:1.35rem;font-weight:800;margin:0.3rem 0;">{top["icon"]} {top["name"]}</div>
-            <div style="color:#4b5563;margin-bottom:0.6rem;">{top["description"]}</div>
+            <div style="font-size:1.35rem;font-weight:800;margin:0.3rem 0;">{top["icon"]} {html.escape(top_name)}</div>
+            <div style="color:#4b5563;margin-bottom:0.6rem;">{html.escape(top_description)}</div>
             <div style="margin-bottom:0.6rem;">
                 <span style="background:#2563eb;color:white;border-radius:4px;padding:0.15rem 0.5rem;font-size:0.78rem;font-weight:700;">
                     {ui_text("recommendations_score", "Match")}: {top["score"]}
@@ -2356,8 +2364,8 @@ def render_recommendations_page(username: str):
         with st.container(border=True):
             col1, col2 = st.columns([4, 1])
             with col1:
-                st.markdown(f"**{rec['icon']} {rec['name']}**")
-                st.caption(rec["description"])
+                st.markdown(f"**{rec['icon']} {recommendation_name(rec)}**")
+                st.caption(recommendation_description(rec))
                 score_pct = int(rec["score"] * 100)
                 st.progress(score_pct / 100.0, text=f"{ui_text('recommendations_score', 'Match')}: {score_pct}%")
             with col2:

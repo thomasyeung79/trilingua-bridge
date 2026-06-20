@@ -76,6 +76,34 @@ def test_all_locales_have_quota_limit_keys():
         assert len(TEXTS[lang]["quota_user_limit"]) > 0, f"{lang}: quota_user_limit is empty"
 
 
+LANDING_PAGE_KEYS = [
+    "landing_value",
+    "features_label",
+    "landing_features_title",
+    "preview_label",
+    "landing_preview_title",
+    "preview_example",
+    "preview_user_text",
+    "preview_you_asked",
+    "preview_ai_suggests",
+    "preview_honorific",
+    "landing_no_commit",
+    "reply",
+    "tone",
+    "cultural",
+]
+
+
+def test_all_locales_have_landing_page_keys():
+    """Landing-page i18n keys must exist and be non-empty in every UI language."""
+    for lang in LOCALES:
+        for key in LANDING_PAGE_KEYS:
+            assert key in TEXTS[lang], f"{lang}: missing landing key '{key}'"
+            assert TEXTS[lang][key], f"{lang}: landing key '{key}' is empty"
+            # Verify the value is not a raw key-name fallback (contains actual translated content)
+            assert TEXTS[lang][key] != key, f"{lang}: '{key}' has raw key fallback"
+
+
 def test_all_locales_have_recommendation_keys():
     """Recommendation navigation/page/card labels must exist in every UI language."""
     base_keys = [

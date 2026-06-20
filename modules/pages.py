@@ -1437,12 +1437,13 @@ def is_demo_mode() -> bool:
 def render_home_dashboard():
     ui_lang_key = st.session_state.ui_lang
 
-    hero(
-        t("app_title"),
-        TEXTS.get(st.session_state.ui_lang, {}).get("subtitle_v2", t("subtitle")),
-        t("not_social"),
-    )
+    subtitle = TEXTS.get(st.session_state.ui_lang, {}).get("subtitle_v2", t("subtitle"))
 
+    hero(t("app_title"), subtitle, t("not_social"))
+
+    # ═══════════════════════════════════════════════════
+    # AUTHENTICATED USER — existing workspace flow
+    # ═══════════════════════════════════════════════════
     if st.session_state.username:
         with ui_panel():
             account_col, logout_col = st.columns([4, 1])
@@ -1461,7 +1462,162 @@ def render_home_dashboard():
                     st.rerun()
 
             render_product_status(st.session_state.username)
+
+    # ═══════════════════════════════════════════════════
+    # NOT AUTHENTICATED — redesigned landing page
+    # ═══════════════════════════════════════════════════
     else:
+        # ── Value proposition ──
+        st.markdown(
+            '<div class="landing-value">'
+            f'<p>🌐 <strong>{t("app_title")}</strong> — '
+            + html.escape(ui_text(
+                "landing_value",
+                "translates not just words. It understands tone, culture, and context across Chinese, English, Korean, Cantonese, and Japanese."
+            ))
+            + '</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ── Feature preview cards ──
+        st.markdown(
+            f'<div class="landing-section-label">'
+            f'{html.escape(ui_text("features_label", "Features"))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="landing-section-title">'
+            f'{html.escape(ui_text("landing_features_title", "What you can do"))}</div>',
+            unsafe_allow_html=True,
+        )
+
+        cols = st.columns(4)
+        features = [
+            ("🎯", "AI Chat Coach",
+             "Practice real conversations. Get 3 reply options with naturalness scores, tone analysis, and cultural notes.",
+             "icon-gradient-blue"),
+            ("🌐", "Translation & Expression",
+             "Translate naturally. Improve awkward sentences into fluent, native-sounding alternatives.",
+             "icon-gradient-teal"),
+            ("🧭", "Tone & Cultural AI",
+             "Understand hidden meaning, politeness levels, and cultural context across 5 languages.",
+             "icon-gradient-amber"),
+            ("🎤", "Voice & Screenshots",
+             "Speak, record, or upload screenshots. AI handles voice I/O and vision analysis.",
+             "icon-gradient-rose"),
+        ]
+        for i, (icon, title, desc, gradient) in enumerate(features):
+            with cols[i]:
+                st.markdown(
+                    f'<div class="landing-feature-card">'
+                    f'<div class="landing-feature-icon {gradient}">{icon}</div>'
+                    f'<h3>{html.escape(title)}</h3>'
+                    f'<p>{html.escape(desc)}</p>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+        # ── Static workspace preview ──
+        st.markdown(
+            f'<div class="landing-section-label">'
+            f'{html.escape(ui_text("preview_label", "Preview"))}</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            f'<div class="landing-section-title">'
+            f'{html.escape(ui_text("landing_preview_title", "See it in action"))}</div>',
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f'<div class="preview-section">'
+            f'<div class="preview-label">'
+            f'{html.escape(ui_text("preview_example", "Example: Korean polite reply"))}</div>',
+            unsafe_allow_html=True,
+        )
+
+        # User bubble
+        preview_user_text = ui_text(
+            "preview_user_text",
+            '"How do I reply politely in Korean to a senior who invited me to dinner, but I need to decline?"'
+        )
+        st.markdown(
+            '<div class="preview-bubble preview-bubble-user">'
+            f'<strong>👤 {html.escape(ui_text("preview_you_asked", "You asked:"))}</strong><br>'
+            f'{html.escape(preview_user_text)}'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # AI response header
+        st.markdown(
+            '<div class="preview-bubble preview-bubble-ai">'
+            f'<strong>🤖 {html.escape(ui_text("preview_ai_suggests", "AI suggests:"))}</strong>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+        # Structured output items
+        preview_items = [
+            ("reply", "Korean reply",
+             "죄송합니다. 약속이 있어서 다음에 꼭 뵙고 싶습니다. 감사합니다."),
+            ("tone", "Tone analysis",
+             f"Very polite · Formal · Respectful "
+             f"<em>({html.escape(ui_text('preview_honorific', 'honorific: -습니다 form'))})</em>"),
+            ("cultural", "Cultural note",
+             "In Korean culture, offering a genuine reason (약속이 있어서 = 'I have plans') "
+             "softens the refusal. A simple 'no' can sound rude."),
+            ("pronunciation", "Pronunciation guide",
+             "joe-song-ham-ni-da · yak-sok-i iss-eo-seo · kkok tteup-go sip-seum-ni-da"),
+        ]
+        for idx, (key, label, value) in enumerate(preview_items):
+            border_none = ' style="border-bottom:none;"' if idx == len(preview_items) - 1 else ""
+            st.markdown(
+                f'<div class="preview-output-item"{border_none}>'
+                f'<div class="preview-output-label">{html.escape(ui_text(key, label))}</div>'
+                f'<div class="preview-output-value">{value}</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── CTA row ──
+        st.markdown('<div class="landing-cta-row">', unsafe_allow_html=True)
+        cta_cols = st.columns(3)
+        with cta_cols[0]:
+            if st.button(
+                f"🚀 {ui_text('continue_guest', 'Guest')}",
+                use_container_width=True,
+                key="landing_guest_btn",
+                type="primary",
+            ):
+                st.session_state.username = "guest"
+                st.session_state.auth_mode = "guest"
+                st.rerun()
+        with cta_cols[1]:
+            if st.button(
+                "🔑 Sign In",
+                use_container_width=True,
+                key="landing_signin_btn",
+            ):
+                pass  # scroll down naturally — auth section follows
+        with cta_cols[2]:
+            st.link_button(
+                "📂 View on GitHub",
+                "https://github.com/thomasyeung79/trilingua-bridge",
+                use_container_width=True,
+            )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.caption(html.escape(ui_text(
+            "landing_no_commit",
+            "No account needed to try — guest mode works immediately. Sign up only if you want to save history."
+        )))
+
+        # ── Auth section (below CTA — preserved as-is) ──
+        st.divider()
         with ui_panel():
             st.markdown(f"**{t('account_title')}**")
             st.caption(t("account_note"))
@@ -1508,6 +1664,9 @@ def render_home_dashboard():
                     st.session_state.auth_mode = "guest"
                     st.rerun()
 
+    # ═══════════════════════════════════════════════════
+    # PREFERENCES — shared (authenticated & non-auth)
+    # ═══════════════════════════════════════════════════
     prefs_container = (
         st.expander(t("prefs_title"), expanded=True)
         if st.session_state.username
@@ -1565,6 +1724,9 @@ def render_home_dashboard():
 
         st.caption(t("tip"))
 
+    # ═══════════════════════════════════════════════════
+    # POST-LOGIN: workspace or start tip
+    # ═══════════════════════════════════════════════════
     if not st.session_state.username:
         product_note(
             ui_text("start_tip_title", "Start in 10 seconds"),

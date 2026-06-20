@@ -202,15 +202,33 @@ PRODUCT_CSS = """
     margin-top: 2px;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1024px) {
     .workflow-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 768px) {
+    .workflow-grid {
+        grid-template-columns: 1fr 1fr;
+    }
     .product-status-grid {
         grid-template-columns: 1fr;
+    }
+    .course-card {
+        min-height: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .workflow-grid {
+        grid-template-columns: 1fr;
+    }
+    .workflow-step {
+        min-height: auto;
+    }
+    .product-status-card {
+        min-height: auto;
     }
 }
 </style>

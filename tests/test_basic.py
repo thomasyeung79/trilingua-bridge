@@ -1,15 +1,14 @@
 """Basic unit tests for TriLingua Bridge pure helpers."""
 
+import hashlib
 import json
 import time
-import hashlib
-from pathlib import Path
-from typing import Dict, Any
-
+from typing import Any
 
 # ── Safe JSON loads ─────────────────────────────────────────────
 
-def safe_json_loads(text: str) -> Dict[str, Any]:
+
+def safe_json_loads(text: str) -> dict[str, Any]:
     """Parse JSON safely, wrapping non-dict results."""
     try:
         data = json.loads(text)
@@ -25,7 +24,7 @@ def test_safe_json_loads_valid_dict():
 
 
 def test_safe_json_loads_valid_list():
-    result = safe_json_loads('[1, 2, 3]')
+    result = safe_json_loads("[1, 2, 3]")
     assert result == {"result": [1, 2, 3]}
 
 
@@ -39,15 +38,26 @@ def test_safe_json_loads_empty_string():
 
 # ── Language normalisation ──────────────────────────────────────
 
+
 def normalize_lang(lang: str) -> str:
     """Normalise language code aliases."""
     aliases = {
-        "zh-cn": "zh", "zh_hans": "zh", "zh-hans": "zh",
-        "mandarin": "zh", "cn": "zh",
-        "cantonese": "yue", "zh-hk": "yue", "zh_hant": "yue", "zh-hant": "yue",
-        "ko-kr": "ko", "kr": "ko",
-        "en-us": "en", "en-au": "en", "en-gb": "en",
-        "ja-jp": "ja", "jp": "ja",
+        "zh-cn": "zh",
+        "zh_hans": "zh",
+        "zh-hans": "zh",
+        "mandarin": "zh",
+        "cn": "zh",
+        "cantonese": "yue",
+        "zh-hk": "yue",
+        "zh_hant": "yue",
+        "zh-hant": "yue",
+        "ko-kr": "ko",
+        "kr": "ko",
+        "en-us": "en",
+        "en-au": "en",
+        "en-gb": "en",
+        "ja-jp": "ja",
+        "jp": "ja",
     }
     return aliases.get(lang, lang)
 
@@ -70,7 +80,8 @@ def test_normalize_lang_unknown():
 
 # ── Usage helpers ───────────────────────────────────────────────
 
-def normalize_usage(usage: Dict[str, Any]) -> Dict[str, Any]:
+
+def normalize_usage(usage: dict[str, Any]) -> dict[str, Any]:
     """Extract token and model keys from usage dict."""
     usage = usage or {}
     return {
@@ -96,10 +107,23 @@ def test_normalize_usage_none():
 # ── JSON explanation key detection ──────────────────────────────
 
 EXPLANATION_KEYS = {
-    "notes", "reason", "tips", "intent", "tone_notes",
-    "tone_summary", "cultural_notes", "caution", "explanation",
-    "why", "meaning", "note", "message", "error", "summary",
-    "hidden_meaning", "recommended_understanding",
+    "notes",
+    "reason",
+    "tips",
+    "intent",
+    "tone_notes",
+    "tone_summary",
+    "cultural_notes",
+    "caution",
+    "explanation",
+    "why",
+    "meaning",
+    "note",
+    "message",
+    "error",
+    "summary",
+    "hidden_meaning",
+    "recommended_understanding",
 }
 
 
@@ -111,6 +135,7 @@ def test_explanation_keys_coverage():
 
 
 # ── Limit normalisation ─────────────────────────────────────────
+
 
 def normalize_limit(limit_value: int) -> int:
     try:
@@ -138,6 +163,7 @@ def test_normalize_limit_invalid():
 
 # ── Stable key fragment (used for widget keys) ──────────────────
 
+
 def stable_key_fragment(*parts: str) -> str:
     raw = "|".join(str(part or "") for part in parts)
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
@@ -156,32 +182,30 @@ def test_stable_key_fragment_different():
 
 # ── Looks-like-JSON check ───────────────────────────────────────
 
+
 def looks_like_json(value: str) -> bool:
     if not isinstance(value, str):
         return False
     value = value.strip()
-    return (
-        value.startswith("{") and value.endswith("}")
-    ) or (
-        value.startswith("[") and value.endswith("]")
-    )
+    return (value.startswith("{") and value.endswith("}")) or (value.startswith("[") and value.endswith("]"))
 
 
 def test_looks_like_json_object():
     assert looks_like_json('{"a":1}')
     assert looks_like_json('  {"a":1}  ')
-    assert not looks_like_json('text')
-    assert not looks_like_json('')
+    assert not looks_like_json("text")
+    assert not looks_like_json("")
     assert not looks_like_json(123)
 
 
 def test_looks_like_json_array():
-    assert looks_like_json('[1,2,3]')
-    assert not looks_like_json('[incomplete')
-    assert not looks_like_json('incomplete]')
+    assert looks_like_json("[1,2,3]")
+    assert not looks_like_json("[incomplete")
+    assert not looks_like_json("incomplete]")
 
 
 # ── Row time formatting ─────────────────────────────────────────
+
 
 def format_row_time(timestamp_value: float) -> str:
     try:
@@ -213,6 +237,7 @@ def test_format_row_time_zero():
 
 # ── Password hashing signature check ────────────────────────────
 
+
 def test_hash_password_returns_required_keys():
     salt = "a" * 32
     result = hashlib.pbkdf2_hmac(
@@ -226,6 +251,7 @@ def test_hash_password_returns_required_keys():
 
 
 # ── Sentry privacy tests ─────────────────────────────────────────
+
 
 def _make_test_event() -> dict:
     """Build a realistic Sentry event with sensitive data."""
@@ -265,6 +291,7 @@ def _make_test_event() -> dict:
 def test_sanitize_removes_request_headers():
     """Request headers are removed entirely (Fix 2)."""
     from error_monitor import _sanitize_event
+
     event = _make_test_event()
     result = _sanitize_event(event)
     assert result["request"]["headers"] == {}
@@ -273,6 +300,7 @@ def test_sanitize_removes_request_headers():
 def test_sanitize_redacts_nested_password():
     """Nested extra.password is redacted."""
     from error_monitor import _sanitize_event
+
     event = _make_test_event()
     result = _sanitize_event(event)
     assert result["extra"]["password"] == "[filtered]"
@@ -284,6 +312,7 @@ def test_sanitize_redacts_nested_password():
 def test_sanitize_redacts_contexts_supabase():
     """Nested contexts.supabase is redacted (the key name triggers redaction)."""
     from error_monitor import _sanitize_event
+
     event = _make_test_event()
     result = _sanitize_event(event)
     assert result["contexts"]["supabase"] == "[filtered]"
@@ -293,6 +322,7 @@ def test_sanitize_redacts_contexts_supabase():
 def test_sanitize_removes_breadcrumbs():
     """Breadcrumbs are completely silenced."""
     from error_monitor import _sanitize_event
+
     event = _make_test_event()
     result = _sanitize_event(event)
     assert result["breadcrumbs"] == {}
@@ -301,6 +331,7 @@ def test_sanitize_removes_breadcrumbs():
 def test_sanitize_preserves_safe_keys():
     """Non-sensitive keys are preserved."""
     from error_monitor import _sanitize_event
+
     event = _make_test_event()
     result = _sanitize_event(event)
     assert result["extra"]["safe_key"] == "hello"
@@ -311,6 +342,7 @@ def test_sanitize_preserves_safe_keys():
 def test_sanitize_redacts_api_key_patterns():
     """Strings resembling provider API keys are redacted by embedded secret regex."""
     from error_monitor import _redact_secrets, _sanitize_value
+
     # Full string matching sk- pattern
     assert _redact_secrets("sk-abc1234567890123456789") == "[filtered-secret]"
     assert _redact_secrets("sk-ant-mykey1234567890abcdef") == "[filtered-secret]"
@@ -326,14 +358,17 @@ def test_sanitize_redacts_api_key_patterns():
 def test_init_monitoring_no_dsn():
     """init_monitoring returns False without SENTRY_DSN."""
     import os
+
     os.environ.pop("SENTRY_DSN", None)
     from error_monitor import init_monitoring
+
     assert init_monitoring() is False
 
 
 def test_capture_error_never_raises():
     """capture_error never raises an exception."""
     from error_monitor import capture_error
+
     capture_error("test", extra={"key": "value"})
     capture_error("test", extra={"password": "secret"})
     capture_error("test")
@@ -344,6 +379,7 @@ def test_capture_error_never_raises():
 def test_sanitize_recursive_depth_limit():
     """Sanitizer does not overflow on deeply nested structures."""
     from error_monitor import _sanitize_value
+
     deep = {"a": {"b": {"c": {"d": {"e": {"f": {"g": {"h": {"i": "value"}}}}}}}}}
     result = _sanitize_value(deep)
     # Should not crash
@@ -353,6 +389,7 @@ def test_sanitize_recursive_depth_limit():
 def test_sanitize_redacts_api_key_and_apikey_variants():
     """Various api_key key casing patterns are redacted."""
     from error_monitor import _sanitize_value
+
     test_cases = [
         {"API_KEY": "secret"},
         {"api_key": "secret"},
@@ -368,6 +405,7 @@ def test_sanitize_redacts_api_key_and_apikey_variants():
 def test_provider_capture_no_raw_error():
     """ai_helper.py capture_error calls use safe literals, not raw error variables."""
     import os
+
     path = os.path.join(os.path.dirname(__file__), "..", "ai_helper.py")
     with open(path, encoding="utf-8") as f:
         content = f.read()
@@ -402,10 +440,19 @@ def test_provider_capture_no_raw_error():
 
 # ── Sentry privacy hardening tests (Fix 1–7) ───────────────────
 
+
 def test_sanitize_removes_request_data():
     """request.data and request.cookies are removed (Fix 1)."""
     from error_monitor import _sanitize_event
-    event = {"request": {"data": "user_input=hello", "cookies": "session=abc", "query_string": "page=1", "headers": {"content-type": "text"}}}
+
+    event = {
+        "request": {
+            "data": "user_input=hello",
+            "cookies": "session=abc",
+            "query_string": "page=1",
+            "headers": {"content-type": "text"},
+        }
+    }
     result = _sanitize_event(event)
     assert result["request"]["data"] == "[filtered]"
     assert result["request"]["cookies"] == "[filtered]"
@@ -415,6 +462,7 @@ def test_sanitize_removes_request_data():
 def test_sanitize_removes_user_section():
     """event.user is removed (Fix 2)."""
     from error_monitor import _sanitize_event
+
     event = {"user": {"email": "test@example.com", "username": "alice"}}
     result = _sanitize_event(event)
     assert result["user"] == {}
@@ -423,6 +471,7 @@ def test_sanitize_removes_user_section():
 def test_sanitize_redacts_email_keys():
     """Email keys are redacted (Fix 2 + key patterns)."""
     from error_monitor import _sanitize_event
+
     event = {"extra": {"email": "user@example.com", "phone": "123-456"}}
     result = _sanitize_event(event)
     assert result["extra"]["email"] == "[filtered]"
@@ -432,6 +481,7 @@ def test_sanitize_redacts_email_keys():
 def test_sanitize_logentry_sanitized():
     """logentry string is sanitised for embedded secrets (Fix 4)."""
     from error_monitor import _sanitize_event
+
     event = {"logentry": "Connection to postgres://user:pass@db.supabase.co:5432 failed"}
     result = _sanitize_event(event)
     assert "postgres://" not in result["logentry"]
@@ -441,6 +491,7 @@ def test_sanitize_logentry_sanitized():
 def test_sanitize_message_sanitized():
     """message string is sanitised (Fix 4)."""
     from error_monitor import _sanitize_event
+
     event = {"message": "Error: Basic dXNlcjpwYXNz"}
     result = _sanitize_event(event)
     assert "[filtered-secret]" in result["message"]
@@ -449,6 +500,7 @@ def test_sanitize_message_sanitized():
 def test_redact_bearer_token():
     """Embedded Bearer token is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "Authorization: Bearer sk-abc1234567890123456789"
     result = _redact_secrets(text)
     assert "Bearer" in result
@@ -459,6 +511,7 @@ def test_redact_bearer_token():
 def test_redact_postgres_url():
     """Embedded postgres:// URL is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "connecting to postgres://user:pass@db.supabase.co:5432/postgres"
     result = _redact_secrets(text)
     assert "postgres://" not in result
@@ -468,6 +521,7 @@ def test_redact_postgres_url():
 def test_redact_mysql_url():
     """Embedded mysql:// URL is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "mysql://admin:secret@mysql.example.com:3306/db"
     result = _redact_secrets(text)
     assert "mysql://" not in result
@@ -477,6 +531,7 @@ def test_redact_mysql_url():
 def test_redact_mongodb_url():
     """Embedded mongodb:// URL is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "mongodb://user:pass@cluster.mongodb.net/db"
     result = _redact_secrets(text)
     assert "mongodb://" not in result
@@ -486,6 +541,7 @@ def test_redact_mongodb_url():
 def test_redact_redis_url():
     """Embedded redis:// URL is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "redis://:password@redis.internal:6379/0"
     result = _redact_secrets(text)
     assert "redis://" not in result
@@ -495,6 +551,7 @@ def test_redact_redis_url():
 def test_sanitize_non_string_key():
     """Non-string dictionary keys do not crash sanitizer (Fix 6)."""
     from error_monitor import _sanitize_value
+
     result = _sanitize_value({42: "value", None: "other", ("tuple",): "test"})
     # Should not crash even with non-string keys
     assert result is not None
@@ -503,6 +560,7 @@ def test_sanitize_non_string_key():
 def test_sanitize_bytes_value():
     """Bytes values are handled without crash (Fix 6)."""
     from error_monitor import _sanitize_value
+
     result = _sanitize_value({"data": b"binary content"})
     assert result["data"] == "[filtered-bytes]"
     assert result is not None
@@ -510,9 +568,11 @@ def test_sanitize_bytes_value():
 
 # ── Sentry privacy hardening v2 tests (Fix 1–6 from Codex review) ──
 
+
 def test_exception_value_replaced():
     """Exception value is replaced with [filtered-exception-message] (Fix 1)."""
     from error_monitor import _sanitize_event
+
     event = {"exception": {"values": [{"type": "ValueError", "value": "Bearer sk-abc1234567890123456789 crashed"}]}}
     result = _sanitize_event(event)
     assert result["exception"]["values"][0]["value"] == "[filtered-exception-message]"
@@ -522,6 +582,7 @@ def test_exception_value_replaced():
 def test_request_headers_removed():
     """Request headers dict is replaced with empty dict (Fix 2)."""
     from error_monitor import _sanitize_event
+
     event = {"request": {"headers": {"Authorization": "Bearer xxx", "User-Agent": "Mozilla/5.0"}}}
     result = _sanitize_event(event)
     assert result["request"]["headers"] == {}
@@ -530,6 +591,7 @@ def test_request_headers_removed():
 def test_request_url_query_stripped():
     """Query parameters are stripped from request.url (Fix 3)."""
     from error_monitor import _sanitize_event
+
     event = {"request": {"url": "https://example.com/path?token=abc123&secret=xyz"}}
     result = _sanitize_event(event)
     assert "?" not in result["request"]["url"]
@@ -539,6 +601,7 @@ def test_request_url_query_stripped():
 def test_before_send_fails_closed():
     """If before_send sanitizer crashes, event is dropped (Fix 4)."""
     from error_monitor import _before_send
+
     # None event would cause AttributeError in _sanitize_event
     result = _before_send(None, None)
     assert result is None
@@ -547,6 +610,7 @@ def test_before_send_fails_closed():
 def test_redact_jwt():
     """JWT-like strings (eyJ...eyJ...) are redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"
     text = f"token={jwt}"
     result = _redact_secrets(text)
@@ -557,6 +621,7 @@ def test_redact_jwt():
 def test_redact_password_in_text():
     """password=value in text is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "connection password=supersecret host=localhost"
     result = _redact_secrets(text)
     assert "supersecret" not in result
@@ -566,6 +631,7 @@ def test_redact_password_in_text():
 def test_redact_api_key_in_text():
     """api_key=value in text is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "api_key=sk-abc12345678901234567890"
     result = _redact_secrets(text)
     assert "[filtered-secret]" in result
@@ -574,6 +640,7 @@ def test_redact_api_key_in_text():
 def test_redact_credential_url():
     """Credential URL (https://user:pass@host) is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "connect to https://admin:secret123@db.example.com:8080/db"
     result = _redact_secrets(text)
     assert "admin:secret123" not in result
@@ -583,6 +650,7 @@ def test_redact_credential_url():
 def test_redact_token_equals():
     """token=value in text is redacted (Fix 5)."""
     from error_monitor import _redact_secrets
+
     text = "token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature"
     result = _redact_secrets(text)
     assert "[filtered-secret]" in result

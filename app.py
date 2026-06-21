@@ -3,40 +3,39 @@
 Imports page rendering from modules/ and dispatches via st.session_state.page.
 """
 
-import os
-
 import streamlit as st
 from dotenv import load_dotenv
 
+from db_helper import ensure_history_columns, init_db
 from error_monitor import init_monitoring
-from ui_helper import inject_css, t, TEXTS
-from db_helper import init_db, ensure_history_columns
-from modules.styles import inject_product_css
 from modules.pages import (
     init_state,
     is_demo_mode,
-    ui_text,
-    render_home_dashboard,
-    render_say_translate_page,
-    render_mean_coach_kpop_page,
-    render_lessons_page,
-    render_review_page,
-    render_vocab_bank_page,
-    render_learning_report_page,
-    render_grammar_page,
-    render_natural_page,
-    render_vocabulary_page,
-    render_tone_page,
-    render_history_page,
     render_about_page,
+    render_grammar_page,
+    render_history_page,
+    render_home_dashboard,
+    render_learning_report_page,
+    render_lessons_page,
+    render_mean_coach_kpop_page,
+    render_natural_page,
     render_recommendations_page,
+    render_review_page,
+    render_say_translate_page,
+    render_tone_page,
+    render_vocab_bank_page,
+    render_vocabulary_page,
+    ui_text,
 )
+from modules.styles import inject_product_css
+from ui_helper import inject_css, t
 
 load_dotenv()
 
 # ── Sentry error monitoring (optional, graceful if not configured) ──
 init_monitoring()
 # ── end Sentry ──
+
 
 # ── PWA injection ─────────────────────────────────
 def inject_pwa_tags():
@@ -107,6 +106,7 @@ inject_product_css()
 
 init_state()
 
+
 # ── Database (cached — runs once per server process, not on every rerun) ──
 @st.cache_resource
 def _init_db_once():
@@ -115,12 +115,14 @@ def _init_db_once():
     ensure_history_columns()
     return True
 
+
 try:
     _init_db_once()
 except Exception:
     st.error(t("db_init_failed"))
     try:
         from error_monitor import capture_error
+
         capture_error("Database init failed at startup")
     except Exception:
         pass

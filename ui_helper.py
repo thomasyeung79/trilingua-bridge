@@ -1,9 +1,8 @@
 import html
 import json
-from typing import Dict, Any, List, Tuple
+from typing import Any
 
 import streamlit as st
-
 
 UI_LANGS = ["en", "zh", "ko", "yue", "ja"]
 
@@ -74,7 +73,7 @@ def t(key: str) -> str:
     return TEXTS.get(lang, TEXTS["en"]).get(key, key)
 
 
-def get_lang_display() -> Dict[str, str]:
+def get_lang_display() -> dict[str, str]:
     lang = st.session_state.get("ui_lang", "en")
     return LANG_DISPLAY_BY_UI.get(lang, LANG_DISPLAY_BY_UI["en"])
 
@@ -119,7 +118,7 @@ def persona_display(code: str) -> str:
     return labels.get(code, {}).get(lang, code)
 
 
-def local_levels() -> Tuple[List[str], Dict[str, str]]:
+def local_levels() -> tuple[list[str], dict[str, str]]:
     lang = st.session_state.get("ui_lang", "en")
 
     if lang == "zh":
@@ -137,7 +136,7 @@ def local_levels() -> Tuple[List[str], Dict[str, str]]:
     return labels, dict(zip(labels, codes))
 
 
-def local_tones() -> Tuple[List[str], Dict[str, str]]:
+def local_tones() -> tuple[list[str], dict[str, str]]:
     lang = st.session_state.get("ui_lang", "en")
 
     tone_data = {
@@ -195,7 +194,7 @@ def build_persona_profile(
     source_lang: str,
     target_lang: str,
     ui_lang: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     base = {
         "role": "You are TriLingua Bridge, a cross-cultural communication coach.",
         "source_lang": source_lang,
@@ -914,19 +913,19 @@ def hero(title: str, sub: str = "", note: str = ""):
         '<div class="hero-box">'
         '<div class="hero-kicker">'
         '<div class="hero-logo">TL</div>'
-        '<div>'
+        "<div>"
         f'<div class="hero-kicker-text">{html.escape(t("hero_langs"))}</div>'
-        f'{note_html}'
-        '</div>'
-        '</div>'
+        f"{note_html}"
+        "</div>"
+        "</div>"
         f'<div class="hero-title">{title}</div>'
-        f'{sub_html}'
+        f"{sub_html}"
         '<div class="hero-pills">'
         f'<div class="hero-pill">{html.escape(t("hero_pill_reply"))}</div>'
         f'<div class="hero-pill">{html.escape(t("hero_pill_tone"))}</div>'
         f'<div class="hero-pill">{html.escape(t("hero_pill_history"))}</div>'
-        '</div>'
-        '</div>'
+        "</div>"
+        "</div>"
     )
 
     st.markdown(html_block, unsafe_allow_html=True)
@@ -938,14 +937,10 @@ def looks_like_json(value: str) -> bool:
 
     value = value.strip()
 
-    return (
-        value.startswith("{") and value.endswith("}")
-    ) or (
-        value.startswith("[") and value.endswith("]")
-    )
+    return (value.startswith("{") and value.endswith("}")) or (value.startswith("[") and value.endswith("]"))
 
 
-def render_structured_response(obj: Dict[str, Any]):
+def render_structured_response(obj: dict[str, Any]):
     st.markdown('<div class="output-card">', unsafe_allow_html=True)
 
     if "reply_options" in obj:
@@ -959,9 +954,9 @@ def render_structured_response(obj: Dict[str, Any]):
 
                 meta = []
                 if score not in ("", None):
-                    meta.append(f'{t("naturalness_score")}: {score}')
+                    meta.append(f"{t('naturalness_score')}: {score}")
                 if tone:
-                    meta.append(f'{t("feature_tone")}: {tone}')
+                    meta.append(f"{t('feature_tone')}: {tone}")
 
                 meta_text = " · ".join(meta)
 
@@ -1127,7 +1122,7 @@ def render_result(result: Any):
     st.markdown(str(result))
 
 
-def show_model_caption(usage: Dict[str, Any], latency_ms: int):
+def show_model_caption(usage: dict[str, Any], latency_ms: int):
     usage = usage or {}
     model = usage.get("model", "-")
     prompt_tokens = usage.get("prompt_tokens", "-")
@@ -1141,7 +1136,7 @@ def show_model_caption(usage: Dict[str, Any], latency_ms: int):
     )
 
 
-def normalize_usage(usage: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_usage(usage: dict[str, Any]) -> dict[str, Any]:
     usage = usage or {}
 
     return {
@@ -1222,7 +1217,7 @@ TEXTS = {
         "preview_label": "Preview",
         "landing_preview_title": "See it in action",
         "preview_example": "Example: Korean polite reply",
-        "preview_user_text": "\"How do I reply politely in Korean to a senior who invited me to dinner, but I need to decline?\"",
+        "preview_user_text": '"How do I reply politely in Korean to a senior who invited me to dinner, but I need to decline?"',
         "preview_you_asked": "You asked:",
         "preview_ai_suggests": "AI suggests:",
         "preview_honorific": "honorific: -??? form",
@@ -1906,7 +1901,7 @@ TEXTS["ko"] = {
         "preview_label": "미리보기",
         "landing_preview_title": "실제 예시 보기",
         "preview_example": "예시: 한국어 정중한 답장",
-        "preview_user_text": "\"선배가 저녁 식사에 초대했는데 정중하게 거절해야 해요. 한국어로 어떻게 답하면 좋을까요?\"",
+        "preview_user_text": '"선배가 저녁 식사에 초대했는데 정중하게 거절해야 해요. 한국어로 어떻게 답하면 좋을까요?"',
         "preview_you_asked": "질문:",
         "preview_ai_suggests": "AI 제안:",
         "preview_honorific": "높임 표현: -습니다 체",
@@ -1914,17 +1909,14 @@ TEXTS["ko"] = {
         "reply": "한국어 답장",
         "tone": "어조 분석",
         "cultural": "문화 메모",
-
         "nav_home": "홈",
         "back_home": "홈으로 돌아가기",
         "nav_history": "기록",
         "nav_about": "소개",
-
         "what_can": "무엇을 할 수 있나요?",
         "what_can_v2": "나만의 다문화 채팅 도우미",
         "what_can_sub": "작업을 선택하고 언어, 말투, 문화적 맥락을 맞춰 보세요.",
         "not_social": "이 앱은 소셜 플랫폼이 아닙니다.",
-
         "mode_say": "더 자연스럽게 말하기",
         "mode_say_sub": "문장을 더 자연스럽게 표현해요",
         "mode_mean": "무슨 뜻일까요?",
@@ -1935,7 +1927,6 @@ TEXTS["ko"] = {
         "mode_coach_sub": "문화 맥락에 맞춘 답장",
         "mode_coach_v2": "AI 채팅 코치",
         "mode_coach_sub_v2": "중국 / 홍콩 / 한국 / 호주 / 미국 문화에 맞춘 답장",
-
         "feature_translate": "번역",
         "feature_grammar": "문법",
         "feature_grammar_sub": "수준에 맞춰 문법을 교정해요",
@@ -1971,7 +1962,6 @@ TEXTS["ko"] = {
         "recommendation_kpop_desc": "가사, 드라마 대사, 은어, 문화적 배경을 이해해요.",
         "recommendation_conversation_memory_name": "대화 기억 코치",
         "recommendation_conversation_memory_desc": "AI가 앞 내용을 기억하는 자연스러운 다중 턴 대화를 이어가요.",
-
         "input_text": "텍스트를 입력하거나 붙여넣으세요",
         "run": "실행",
         "enter_text_translate": "번역할 텍스트를 입력하세요",
@@ -1986,7 +1976,6 @@ TEXTS["ko"] = {
         "db_init_failed": "데이터베이스 초기화 실패",
         "history_save_failed": "기록 저장 실패",
         "detected_source": "감지된 원문 언어",
-
         "voice_input": "음성 입력",
         "swap_unavailable_auto": "자동 감지 — 교체 불가",
         "upload_audio": "오디오 파일 업로드",
@@ -2002,11 +1991,9 @@ TEXTS["ko"] = {
         "start_recording": "녹음 시작",
         "stop_recording": "정지",
         "mic_not_installed": "streamlit-mic-recorder가 설치되지 않았습니다.",
-
         "pronunciation_label": "발음",
         "playing_audio": "음성 생성 중...",
         "tts_not_supported": "이 언어는 TTS를 지원하지 않습니다.",
-
         "relation_mode": "관계 / 스타일",
         "style_friend": "친구",
         "style_crush": "썸 / 호감 상대",
@@ -2016,7 +2003,6 @@ TEXTS["ko"] = {
         "style_cold": "조금 차갑게",
         "style_kpop": "K-pop 느낌",
         "style_hk": "홍콩 로컬 느낌",
-
         "ctx_kpop": "K-pop 가사",
         "ctx_kdrama": "한국 드라마",
         "ctx_cantodrama": "홍콩 드라마",
@@ -2025,7 +2011,6 @@ TEXTS["ko"] = {
         "ctx_inet": "인터넷 표현",
         "ctx_pop": "대중문화",
         "context_type": "맥락 유형",
-
         "enter_text_correct": "교정할 텍스트를 입력하세요",
         "correct_btn": "문법 교정",
         "learner_level": "학습자 레벨",
@@ -2037,7 +2022,6 @@ TEXTS["ko"] = {
         "explain_vocab_btn": "어휘 설명",
         "enter_text_tone": "말투를 분석할 텍스트를 입력하세요",
         "analyze_tone_btn": "말투 분석",
-
         "history_title": "기록",
         "history_sub": "최근 작업",
         "filter_mode": "모드",
@@ -2050,15 +2034,12 @@ TEXTS["ko"] = {
         "no_history": "아직 기록이 없습니다.",
         "input_label": "입력",
         "output_label": "출력",
-
         "model_info_prefix": "모델",
         "tokens_label": "토큰",
         "latency_label": "지연 시간",
-
         "about_title": "소개",
         "about_desc": "TriLingua Bridge v2 — 다문화 커뮤니케이션 코치.",
         "enter_text_warn": "먼저 텍스트를 입력하세요.",
-
         "naturalness_score_title": "자연스러움 점수",
         "naturalness_verdict": "판단",
         "naturalness_score": "점수",
@@ -2067,7 +2048,6 @@ TEXTS["ko"] = {
         "verdict_natural": "자연스러움",
         "verdict_somewhat_natural": "대체로 자연스러움",
         "verdict_machine_translated": "번역투가 있음",
-
         "region_mode": "지역 / 문화 모드",
         "region_mainland_cn": "중국 본토 모드",
         "region_hk_yue": "홍콩 광둥어 모드",
@@ -2075,13 +2055,11 @@ TEXTS["ko"] = {
         "region_au_en": "호주 영어 모드",
         "region_us_en": "미국 영어 모드",
         "region_jp": "일본어 모드",
-
         "screenshot_mode": "채팅 스크린샷 분석",
         "analyze_screenshot_btn": "스크린샷 분석",
         "upload_screenshot": "채팅 스크린샷 업로드",
         "please_upload_image_first": "먼저 이미지를 업로드하세요.",
         "screenshot_not_available": "스크린샷 분석을 사용할 수 없습니다.",
-
         "reply_options": "답장 추천",
         "tone_notes": "말투 설명",
         "cultural_notes": "문화 설명",
@@ -2275,17 +2253,14 @@ TEXTS["yue"] = {
         "reply": "韓文回覆",
         "tone": "語氣分析",
         "cultural": "文化提示",
-
         "nav_home": "首頁",
         "back_home": "返首頁",
         "nav_history": "歷史",
         "nav_about": "關於",
-
         "what_can": "可以做啲咩？",
         "what_can_v2": "你嘅跨文化聊天助手",
         "what_can_sub": "揀一個任務，保持語言、語氣同文化語境一致。",
         "not_social": "呢個應用唔係社交平台。",
-
         "mode_say": "講得自然啲",
         "mode_say_sub": "令你句嘢聽落更自然",
         "mode_mean": "佢想表達咩？",
@@ -2296,7 +2271,6 @@ TEXTS["yue"] = {
         "mode_coach_sub": "按文化語境幫你諗回覆",
         "mode_coach_v2": "AI 聊天教練",
         "mode_coach_sub_v2": "針對大陸 / 香港 / 韓國 / 澳洲 / 美國文化風格調整",
-
         "feature_translate": "翻譯",
         "feature_grammar": "文法",
         "feature_grammar_sub": "按你程度改錯同提點",
@@ -2332,7 +2306,6 @@ TEXTS["yue"] = {
         "recommendation_kpop_desc": "理解歌詞、影視對白、網絡用語同文化梗。",
         "recommendation_conversation_memory_name": "對話記憶教練",
         "recommendation_conversation_memory_desc": "延續多輪自然對話，等 AI 記住之前講過嘅內容。",
-
         "input_text": "輸入或者貼上文字",
         "run": "開始",
         "enter_text_translate": "輸入要翻譯嘅文字",
@@ -2347,7 +2320,6 @@ TEXTS["yue"] = {
         "db_init_failed": "資料庫初始化失敗",
         "history_save_failed": "儲存歷史失敗",
         "detected_source": "偵測到嘅原文語言",
-
         "voice_input": "語音輸入",
         "swap_unavailable_auto": "自動偵測 — 無法交換",
         "upload_audio": "上載音頻文件",
@@ -2363,11 +2335,9 @@ TEXTS["yue"] = {
         "start_recording": "開始錄音",
         "stop_recording": "停止",
         "mic_not_installed": "未安裝 streamlit-mic-recorder，暫時用唔到咪高峰錄音。",
-
         "pronunciation_label": "發音",
         "playing_audio": "生成語音中...",
         "tts_not_supported": "目前語言暫時唔支援 TTS。",
-
         "relation_mode": "關係 / 風格",
         "style_friend": "朋友",
         "style_crush": "曖昧對象",
@@ -2377,7 +2347,6 @@ TEXTS["yue"] = {
         "style_cold": "冷淡少少",
         "style_kpop": "K-pop 氛圍",
         "style_hk": "香港本地味",
-
         "ctx_kpop": "K-pop 歌詞",
         "ctx_kdrama": "韓劇對白",
         "ctx_cantodrama": "港劇對白",
@@ -2386,7 +2355,6 @@ TEXTS["yue"] = {
         "ctx_inet": "網絡用語",
         "ctx_pop": "流行文化",
         "context_type": "語境類型",
-
         "enter_text_correct": "輸入要修正嘅文字",
         "correct_btn": "文法修正",
         "learner_level": "學習者程度",
@@ -2398,7 +2366,6 @@ TEXTS["yue"] = {
         "explain_vocab_btn": "解釋詞彙",
         "enter_text_tone": "輸入文字以分析語氣",
         "analyze_tone_btn": "分析語氣",
-
         "history_title": "歷史記錄",
         "history_sub": "最近任務",
         "filter_mode": "模式",
@@ -2411,15 +2378,12 @@ TEXTS["yue"] = {
         "no_history": "暫時未有歷史。",
         "input_label": "輸入",
         "output_label": "輸出",
-
         "model_info_prefix": "模型",
         "tokens_label": "Tokens",
         "latency_label": "延遲",
-
         "about_title": "關於",
         "about_desc": "TriLingua Bridge v2 — 跨文化溝通教練。",
         "enter_text_warn": "請先輸入文字先。",
-
         "naturalness_score_title": "自然程度評分",
         "naturalness_verdict": "判斷",
         "naturalness_score": "分數",
@@ -2428,7 +2392,6 @@ TEXTS["yue"] = {
         "verdict_natural": "自然",
         "verdict_somewhat_natural": "大致自然",
         "verdict_machine_translated": "有翻譯腔",
-
         "region_mode": "地區 / 文化模式",
         "region_mainland_cn": "大陸普通話模式",
         "region_hk_yue": "香港粵語模式",
@@ -2436,13 +2399,11 @@ TEXTS["yue"] = {
         "region_au_en": "澳式英文模式",
         "region_us_en": "美式英文模式",
         "region_jp": "日文模式",
-
         "screenshot_mode": "聊天截圖分析",
         "analyze_screenshot_btn": "分析截圖",
         "upload_screenshot": "上載聊天截圖",
         "please_upload_image_first": "請先上載圖片。",
         "screenshot_not_available": "暫時用唔到截圖分析。",
-
         "reply_options": "回覆建議",
         "tone_notes": "語氣說明",
         "cultural_notes": "文化說明",

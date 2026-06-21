@@ -2,7 +2,6 @@
 
 from ui_helper import TEXTS, UI_LANGS
 
-
 LOCALES = UI_LANGS  # ["en", "zh", "ko", "yue", "ja"]
 
 
@@ -57,6 +56,7 @@ def test_all_locales_have_conversation_reset():
 def test_auto_not_in_study_lang_codes():
     """Auto-detect must NOT be in the study language codes list."""
     from ui_helper import STUDY_LANG_CODES
+
     assert "auto" not in STUDY_LANG_CODES
 
 
@@ -126,11 +126,7 @@ def test_all_locales_have_recommendation_keys():
         "kpop",
         "conversation_memory",
     ]
-    feature_keys = [
-        f"recommendation_{feature_id}_{field}"
-        for feature_id in feature_ids
-        for field in ("name", "desc")
-    ]
+    feature_keys = [f"recommendation_{feature_id}_{field}" for feature_id in feature_ids for field in ("name", "desc")]
 
     for lang in LOCALES:
         for key in base_keys + feature_keys:

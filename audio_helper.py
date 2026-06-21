@@ -1,17 +1,16 @@
 import io
 import os
-from typing import Optional
 
+import eng_to_ipa as ipa
 from gtts import gTTS
-from langdetect import detect, DetectorFactory
-
-from pypinyin import pinyin, Style
 from hangul_romanize import Transliter
 from hangul_romanize.rule import academic
-import eng_to_ipa as ipa
+from langdetect import DetectorFactory, detect
+from pypinyin import Style, pinyin
 
 try:
     import pykakasi
+
     KKS = pykakasi.kakasi()
 except Exception:
     KKS = None
@@ -27,7 +26,7 @@ except Exception:
 DetectorFactory.seed = 0
 
 
-def get_secret_value(key: str) -> Optional[str]:
+def get_secret_value(key: str) -> str | None:
     value = os.environ.get(key)
 
     try:
@@ -40,11 +39,11 @@ def get_secret_value(key: str) -> Optional[str]:
     return value
 
 
-def get_openai_api_key() -> Optional[str]:
+def get_openai_api_key() -> str | None:
     return get_secret_value("OPENAI_API_KEY")
 
 
-def normalize_lang(lang: Optional[str]) -> str:
+def normalize_lang(lang: str | None) -> str:
     value = (lang or "").lower().strip()
 
     aliases = {
@@ -81,22 +80,14 @@ def to_pronunciation(text: str, lang: str) -> str:
         if lang == "zh":
             pinyin_result = pinyin(text, style=Style.TONE, strict=False)
 
-            return " ".join(
-                item[0]
-                for item in pinyin_result
-                if item and item[0].strip()
-            )
+            return " ".join(item[0] for item in pinyin_result if item and item[0].strip())
 
         if lang == "yue":
             if pycantonese:
                 try:
                     jyutping_result = pycantonese.characters_to_jyutping(text)
 
-                    return " ".join(
-                        item[1]
-                        for item in jyutping_result
-                        if item and len(item) > 1 and item[1]
-                    )
+                    return " ".join(item[1] for item in jyutping_result if item and len(item) > 1 and item[1])
                 except Exception:
                     pass
 
@@ -118,11 +109,7 @@ def to_pronunciation(text: str, lang: str) -> str:
             if KKS is not None:
                 try:
                     result = KKS.convert(text)
-                    return " ".join(
-                        item["hepburn"]
-                        for item in result
-                        if item and item.get("hepburn")
-                    )
+                    return " ".join(item["hepburn"] for item in result if item and item.get("hepburn"))
                 except Exception:
                     pass
             return text
@@ -150,7 +137,7 @@ def to_pronunciation(text: str, lang: str) -> str:
         return text
 
 
-def synthesize_openai_tts(text: str, lang: str) -> Optional[bytes]:
+def synthesize_openai_tts(text: str, lang: str) -> bytes | None:
     api_key = get_openai_api_key()
     text = text or ""
 
@@ -172,7 +159,7 @@ def synthesize_openai_tts(text: str, lang: str) -> Optional[bytes]:
         return None
 
 
-def synthesize_gtts(text: str, lang: str) -> Optional[bytes]:
+def synthesize_gtts(text: str, lang: str) -> bytes | None:
     text = text or ""
 
     if not text.strip():
@@ -205,7 +192,7 @@ def synthesize_gtts(text: str, lang: str) -> Optional[bytes]:
         return None
 
 
-def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
+def synthesize_tts(text: str, lang: str) -> bytes | None:
     """
     Generate MP3 audio bytes.
 
@@ -233,8 +220,8 @@ def synthesize_tts(text: str, lang: str) -> Optional[bytes]:
 def transcribe_audio(
     file_bytes: bytes,
     filename: str,
-    preferred_lang: Optional[str] = None,
-) -> Optional[str]:
+    preferred_lang: str | None = None,
+) -> str | None:
     api_key = get_openai_api_key()
 
     if not api_key or not file_bytes:

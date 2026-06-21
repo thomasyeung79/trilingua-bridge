@@ -237,4 +237,5 @@ PRODUCT_CSS = """
 
 def inject_product_css():
     import streamlit as st
+
     st.markdown(PRODUCT_CSS, unsafe_allow_html=True)

@@ -1,22 +1,30 @@
-import os
-import sqlite3
-import time
 import hashlib
 import hmac
+import os
 import secrets
-from typing import Optional, List, Dict, Any
+import sqlite3
+import time
+from typing import Any
 
 try:
     from error_monitor import capture_error
 except Exception:
-    def capture_error(*args, **kwargs): pass  # no-op fallback
+
+    def capture_error(*args, **kwargs):
+        pass  # no-op fallback
 
 
 # ── Dual-mode helpers ─────────────────────────────────────────
 
 # ── Configuration helpers ────────────────────────────────────
 
-_PG_CONFIG_KEYS = ["SUPABASE_DB_HOST", "SUPABASE_DB_NAME", "SUPABASE_DB_USER", "SUPABASE_DB_PASSWORD", "SUPABASE_DB_PORT"]
+_PG_CONFIG_KEYS = [
+    "SUPABASE_DB_HOST",
+    "SUPABASE_DB_NAME",
+    "SUPABASE_DB_USER",
+    "SUPABASE_DB_PASSWORD",
+    "SUPABASE_DB_PORT",
+]
 
 
 def _get_secret(key: str) -> str:
@@ -25,6 +33,7 @@ def _get_secret(key: str) -> str:
     if not value:
         try:
             import streamlit as st
+
             value = st.secrets.get(key) or ""
         except Exception:
             pass
@@ -50,7 +59,7 @@ def _get_pg_config() -> dict:
     missing = [k for k in ("host", "password") if not config[k]]
     if missing:
         raise RuntimeError(
-            f"Missing PostgreSQL configuration: SUPABASE_DB_HOST, SUPABASE_DB_PASSWORD. "
+            "Missing PostgreSQL configuration: SUPABASE_DB_HOST, SUPABASE_DB_PASSWORD. "
             "Set USE_POSTGRES=false to use SQLite, or configure these variables."
         )
     return config
@@ -73,6 +82,7 @@ def _now_value() -> float:
 
 # ── Connection management ──────────────────────────────────────
 
+
 def get_db_path() -> str:
     """
     SQLite-only: determine the local database file path.
@@ -90,11 +100,7 @@ def get_db_path() -> str:
     except Exception:
         pass
 
-    return (
-        os.environ.get("DB_PATH")
-        or os.environ.get("TRILINGUA_DB_PATH")
-        or "trilingua_bridge.db"
-    )
+    return os.environ.get("DB_PATH") or os.environ.get("TRILINGUA_DB_PATH") or "trilingua_bridge.db"
 
 
 def get_connection():
@@ -142,6 +148,7 @@ def get_connection():
 
 
 # ── Schema initialisation ──────────────────────────────────────
+
 
 def init_db():
     conn = get_connection()
@@ -395,7 +402,8 @@ def _execute_indices(cursor):
 
 # ── Authentication (PBKDF2 — unchanged logic) ──────────────────
 
-def hash_password(password: str, salt: Optional[str] = None) -> Dict[str, str]:
+
+def hash_password(password: str, salt: str | None = None) -> dict[str, str]:
     salt_value = salt or secrets.token_hex(16)
     password_hash = hashlib.pbkdf2_hmac(
         "sha256",
@@ -413,7 +421,7 @@ def hash_password(password: str, salt: Optional[str] = None) -> Dict[str, str]:
 _RESERVED_USERNAMES = {"guest", "admin", "system", "anonymous", "support"}
 
 
-def create_user(username: str, password: str) -> Dict[str, Any]:
+def create_user(username: str, password: str) -> dict[str, Any]:
     username_value = (username or "").strip().lower()
     password_value = password or ""
 
@@ -474,7 +482,7 @@ def create_user(username: str, password: str) -> Dict[str, Any]:
         conn.close()
 
 
-def authenticate_user(username: str, password: str) -> Dict[str, Any]:
+def authenticate_user(username: str, password: str) -> dict[str, Any]:
     username_value = (username or "").strip().lower()
     conn = get_connection()
 
@@ -519,6 +527,7 @@ def authenticate_user(username: str, password: str) -> Dict[str, Any]:
 
 # ── Schema migration helper (SQLite only) ──────────────────────
 
+
 def ensure_history_columns():
     """
     Adds missing columns for older local databases (SQLite only).
@@ -544,20 +553,21 @@ def ensure_history_columns():
 
 # ── History ────────────────────────────────────────────────────
 
+
 def insert_history(
     username: str,
     mode: str,
-    source_lang: Optional[str],
-    target_lang: Optional[str],
-    native_lang: Optional[str],
-    persona: Optional[str],
-    ui_lang: Optional[str],
+    source_lang: str | None,
+    target_lang: str | None,
+    native_lang: str | None,
+    persona: str | None,
+    ui_lang: str | None,
     user_input: str,
     ai_output: str,
-    tokens_input: Optional[int],
-    tokens_output: Optional[int],
-    model: Optional[str],
-    latency_ms: Optional[int],
+    tokens_input: int | None,
+    tokens_output: int | None,
+    model: str | None,
+    latency_ms: int | None,
 ):
     conn = get_connection()
 
@@ -633,12 +643,12 @@ def normalize_limit(limit: int) -> int:
 def fetch_history(
     username: str,
     limit: int = 50,
-    mode: Optional[str] = None,
-    source_lang: Optional[str] = None,
-    target_lang: Optional[str] = None,
-    persona: Optional[str] = None,
-    search: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    mode: str | None = None,
+    source_lang: str | None = None,
+    target_lang: str | None = None,
+    persona: str | None = None,
+    search: str | None = None,
+) -> list[dict[str, Any]]:
     p = _placeholder()
     query = f"""
         SELECT
@@ -662,7 +672,7 @@ def fetch_history(
         WHERE username = {p}
     """
 
-    params: List[Any] = [username or "guest"]
+    params: list[Any] = [username or "guest"]
 
     if mode:
         query += f" AND mode = {p}"
@@ -701,11 +711,12 @@ def fetch_history(
 
 # ── Learning events ────────────────────────────────────────────
 
+
 def insert_learning_event(
     username: str,
     event_type: str,
-    mode: Optional[str] = None,
-    target_lang: Optional[str] = None,
+    mode: str | None = None,
+    target_lang: str | None = None,
     points: int = 1,
 ):
     conn = get_connection()
@@ -745,7 +756,7 @@ def insert_learning_event(
         conn.close()
 
 
-def fetch_learning_summary(username: str, days: int = 7) -> Dict[str, Any]:
+def fetch_learning_summary(username: str, days: int = 7) -> dict[str, Any]:
     now = _now_value()
     since = now - max(1, int(days or 7)) * 86400
     today_start = time.mktime(time.localtime(now)[:3] + (0, 0, 0, 0, 0, -1))
@@ -839,15 +850,16 @@ def fetch_learning_summary(username: str, days: int = 7) -> Dict[str, Any]:
 
 # ── Saved items (review book) ──────────────────────────────────
 
+
 def add_saved_item(
     username: str,
     item_type: str,
     mode: str,
-    source_lang: Optional[str],
-    target_lang: Optional[str],
+    source_lang: str | None,
+    target_lang: str | None,
     prompt: str,
     content: str,
-    note: Optional[str] = None,
+    note: str | None = None,
 ) -> int:
     conn = get_connection()
 
@@ -904,9 +916,9 @@ def add_saved_item(
 def fetch_saved_items(
     username: str,
     limit: int = 50,
-    item_type: Optional[str] = None,
-    search: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    item_type: str | None = None,
+    search: str | None = None,
+) -> list[dict[str, Any]]:
     p = _placeholder()
     query = f"""
         SELECT id, username, timestamp, item_type, mode, source_lang,
@@ -914,7 +926,7 @@ def fetch_saved_items(
         FROM saved_items
         WHERE username = {p}
     """
-    params: List[Any] = [username or "guest"]
+    params: list[Any] = [username or "guest"]
 
     if item_type:
         query += f" AND item_type = {p}"
@@ -940,13 +952,14 @@ def fetch_saved_items(
 
 # ── Vocab items ────────────────────────────────────────────────
 
+
 def add_vocab_item(
     username: str,
     term: str,
     meaning: str,
-    source_lang: Optional[str],
-    target_lang: Optional[str],
-    example: Optional[str] = None,
+    source_lang: str | None,
+    target_lang: str | None,
+    example: str | None = None,
 ) -> int:
     conn = get_connection()
 
@@ -999,8 +1012,8 @@ def add_vocab_item(
 def fetch_vocab_items(
     username: str,
     limit: int = 80,
-    search: Optional[str] = None,
-) -> List[Dict[str, Any]]:
+    search: str | None = None,
+) -> list[dict[str, Any]]:
     p = _placeholder()
     query = f"""
         SELECT id, username, timestamp, term, meaning, source_lang,
@@ -1008,7 +1021,7 @@ def fetch_vocab_items(
         FROM vocab_items
         WHERE username = {p}
     """
-    params: List[Any] = [username or "guest"]
+    params: list[Any] = [username or "guest"]
 
     if search:
         query += f" AND (term LIKE {p} OR meaning LIKE {p} OR example LIKE {p})"

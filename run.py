@@ -16,32 +16,37 @@ What it does:
 """
 
 import os
-import sys
 import signal
-import subprocess
-import time
-import json
-import urllib.request
-import urllib.error
 import socket
-import select
-import webbrowser
-import threading
 import struct
+import subprocess
+import sys
+import threading
+import time
+import urllib.error
+import urllib.request
+import webbrowser
 import zlib
-from io import BytesIO
-from pathlib import Path
 from http.server import BaseHTTPRequestHandler
-from socketserver import ThreadingTCPServer, TCPServer
+from pathlib import Path
+from socketserver import ThreadingTCPServer
 
 # ── Config ────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
 PWA_DIR = ROOT / "pwa"
 STREAMLIT_PORT = 8501
 PROXY_PORT = 8500
-STREAMLIT_CMD = [sys.executable, "-m", "streamlit", "run", str(ROOT / "app.py"),
-                 "--server.port", str(STREAMLIT_PORT),
-                 "--server.headless", "true"]
+STREAMLIT_CMD = [
+    sys.executable,
+    "-m",
+    "streamlit",
+    "run",
+    str(ROOT / "app.py"),
+    "--server.port",
+    str(STREAMLIT_PORT),
+    "--server.headless",
+    "true",
+]
 
 PWA_FILES = {"manifest.json", "sw.js", "icon.svg", "icon-192.png", "icon-512.png"}
 
@@ -57,6 +62,7 @@ streamlit_proc: subprocess.Popen | None = None
 
 # ── Icon generation ───────────────────────────────────────────
 
+
 def ensure_icons():
     """Generate PNG icons if missing."""
     for size in (192, 512):
@@ -69,6 +75,7 @@ def ensure_icons():
     print("🔨 Generating PWA icons...")
     try:
         from pwa.gen_icons import main as gen
+
         gen()
     except Exception:
         for size in (192, 512):
@@ -108,6 +115,7 @@ def _make_placeholder_png(path: Path, size: int):
 
 # ── Streamlit management ──────────────────────────────────────
 
+
 def start_streamlit():
     global streamlit_proc
     print(f"  Starting Streamlit on port {STREAMLIT_PORT}...")
@@ -142,6 +150,7 @@ def stop_streamlit():
 # Handles both HTTP and WebSocket on the same port.
 # WebSocket connections are detected by the "Upgrade: websocket" header
 # and tunneled via raw TCP to Streamlit.
+
 
 class ProxyHandler(BaseHTTPRequestHandler):
     """Serves PWA files OR proxies HTTP/WebSocket to Streamlit."""
@@ -208,8 +217,16 @@ class ProxyHandler(BaseHTTPRequestHandler):
         try:
             req = urllib.request.Request(target_url, data=body_bytes, method=method)
             # Forward relevant headers
-            for h in ("Cookie", "Accept", "Accept-Language", "Content-Type",
-                      "Origin", "Referer", "User-Agent", "X-Requested-With"):
+            for h in (
+                "Cookie",
+                "Accept",
+                "Accept-Language",
+                "Content-Type",
+                "Origin",
+                "Referer",
+                "User-Agent",
+                "X-Requested-With",
+            ):
                 if self.headers.get(h):
                     req.add_header(h, self.headers[h])
 
@@ -217,8 +234,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 self.send_response(resp.status)
                 for key, val in resp.headers.items():
                     lk = key.lower()
-                    if lk in ("content-type", "content-length", "cache-control",
-                              "set-cookie", "location", "x-accel-redirect"):
+                    if lk in (
+                        "content-type",
+                        "content-length",
+                        "cache-control",
+                        "set-cookie",
+                        "location",
+                        "x-accel-redirect",
+                    ):
                         self.send_header(key, val)
                 self.end_headers()
                 while True:
@@ -240,11 +263,13 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.send_response(502)
         self.send_header("Content-Type", "text/html;charset=UTF-8")
         self.end_headers()
-        msg = "<html><body style='font-family:system-ui;padding:2rem;text-align:center'>" \
-              "<h2>&#127760; TriLingua Bridge</h2>" \
-              "<p>Streamlit is starting up... <a href='/'>Refresh</a></p>" \
-              "<script>setTimeout(()=>location.reload(),2000);</script>" \
-              "</body></html>"
+        msg = (
+            "<html><body style='font-family:system-ui;padding:2rem;text-align:center'>"
+            "<h2>&#127760; TriLingua Bridge</h2>"
+            "<p>Streamlit is starting up... <a href='/'>Refresh</a></p>"
+            "<script>setTimeout(()=>location.reload(),2000);</script>"
+            "</body></html>"
+        )
         self.wfile.write(msg.encode("utf-8"))
 
     # ── WebSocket tunneling ─────────────────────────
@@ -258,9 +283,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         # Forward the original HTTP upgrade request to Streamlit
-        raw_req = (f"{self.command} {self.path} {self.request_version}\r\n"
-                   + "".join(f"{k}: {v}\r\n" for k, v in self.headers.items())
-                   + "\r\n")
+        raw_req = (
+            f"{self.command} {self.path} {self.request_version}\r\n"
+            + "".join(f"{k}: {v}\r\n" for k, v in self.headers.items())
+            + "\r\n"
+        )
         try:
             backend.sendall(raw_req.encode())
         except Exception:
@@ -276,6 +303,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _pipe_sockets(self, client, backend):
         """Copy data bidirectionally between two sockets."""
+
         def forward(src, dst, name):
             try:
                 while True:
@@ -312,6 +340,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
 # ── Threaded PWA Server ───────────────────────────────────────
 
+
 class ThreadedPWAServer(ThreadingTCPServer):
     allow_reuse_address = True
     daemon_threads = True
@@ -322,6 +351,7 @@ class ThreadedPWAServer(ThreadingTCPServer):
 
 
 # ── Main ──────────────────────────────────────────────────────
+
 
 def main():
     if "--direct" in sys.argv:
@@ -342,8 +372,8 @@ def main():
     url = f"http://localhost:{PROXY_PORT}"
 
     print(f"  🌍  Open:  {url}")
-    print(f"  📱  Install: Browser menu → Add to Home Screen")
-    print(f"  ⏹   Ctrl+C to stop")
+    print("  📱  Install: Browser menu → Add to Home Screen")
+    print("  ⏹   Ctrl+C to stop")
     print()
 
     if not NO_BROWSER:

@@ -1,9 +1,9 @@
 """Tests for the AI Feature Recommendation Engine."""
 
-from recommendation_engine import get_recommendations, _language_goal_score, _preference_score, _activity_score
-
+from recommendation_engine import _activity_score, _language_goal_score, _preference_score, get_recommendations
 
 # ── Language goal score tests ──────────────────────────────────
+
 
 def test_kpop_high_for_korean():
     """Korean learners get a high language goal score for K-pop."""
@@ -30,6 +30,7 @@ def test_default_features_high():
 
 
 # ── Preference score tests ─────────────────────────────────────
+
 
 def test_coach_preference_high_with_translation():
     """Frequent translation users get a high coach preference."""
@@ -78,6 +79,7 @@ def test_kpop_preference_high_for_korean():
 
 # ── Activity score tests ───────────────────────────────────────
 
+
 def test_activity_high_with_related_usage():
     """High related feature usage gives a high activity score."""
     mc = {"coach": 15}
@@ -100,6 +102,7 @@ def test_activity_moderate_with_some_usage():
 
 
 # ── Integration tests (get_recommendations) ────────────────────
+
 
 def test_get_recommendations_returns_three():
     """get_recommendations returns exactly 3 recommendations."""
@@ -138,7 +141,9 @@ def test_get_recommendations_custom_max():
 def test_get_recommendations_coach_top_for_translate_user():
     """A user who translates a lot (non-Korean learner) should get Coach as top recommendation."""
     recs = get_recommendations(
-        "test", "en", "en",  # English learner → K-pop doesn't dominate
+        "test",
+        "en",
+        "en",  # English learner → K-pop doesn't dominate
         mode_counts={"translate": 15, "grammar": 1},
     )
     assert recs[0]["id"] == "coach"
@@ -147,7 +152,9 @@ def test_get_recommendations_coach_top_for_translate_user():
 def test_get_recommendations_vocab_top_for_vocab_user():
     """A user with many saved vocab items (non-Korean learner) should get Vocab Builder."""
     recs = get_recommendations(
-        "test", "en", "en",  # English learner → K-pop doesn't dominate
+        "test",
+        "en",
+        "en",  # English learner → K-pop doesn't dominate
         mode_counts={"vocabulary": 5},
         vocab_item_count=15,
     )

@@ -7,7 +7,6 @@ which is supported by all modern browsers.
 """
 
 import os
-import sys
 
 SVG_PATH = os.path.join(os.path.dirname(__file__), "icon.svg")
 OUTPUT_DIR = os.path.dirname(__file__)
@@ -18,8 +17,9 @@ SIZES = [192, 512]
 def gen_with_pillow():
     """Convert SVG to PNG using Pillow + cairosvg or svglib."""
     try:
-        from PIL import Image
         import io
+
+        from PIL import Image
     except ImportError:
         return False
 
@@ -83,11 +83,7 @@ def gen_with_base64_svg():
 
         def _chunk(chunk_type: bytes, data: bytes) -> bytes:
             chunk = chunk_type + data
-            return (
-                struct.pack(">I", len(data))
-                + chunk
-                + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
-            )
+            return struct.pack(">I", len(data)) + chunk + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
 
         # PNG signature
         sig = b"\x89PNG\r\n\x1a\n"

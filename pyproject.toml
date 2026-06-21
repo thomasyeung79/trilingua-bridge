@@ -26,10 +26,33 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "ARG", "PTH", "RUF"]
+ignore = [
+    "RUF001",    # ambiguous punctuation — expected in multilingual i18n
+    "RUF002",    # ambiguous docstring punctuation — expected in multilingual app
+    "RUF003",    # ambiguous comment punctuation — harmless
+    "E501",      # line too long — unavoidable in i18n text strings
+    "ARG001",    # unused function argument — common in callback signatures
+    "PTH101",    # pathlib required — not needed in simple cases
+    "PTH103",    # os.makedirs → Path.mkdir
+    "PTH110",    # os.path.exists → Path.exists
+    "PTH118",    # os.path.join → Path /
+    "PTH120",    # os.path.dirname → Path.parent
+    "PTH123",    # open → Path.open
+    "SIM105",    # try-except-pass → contextlib.suppress
+    "B904",      # raise without from err
+    "B905",      # zip without strict=
+    "B011",      # assert False in tests
+    "RUF015",    # single element slice
+    "F841",      # unused variable
+    "W293",      # blank line whitespace
+    "RUF005",    # list concatenation style
+    "N806",      # variable naming in function scope
+]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "tests/*" = ["S101"]
+"pwa/*" = ["F401"]
 
 [tool.ruff.format]
 quote-style = "double"

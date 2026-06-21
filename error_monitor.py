@@ -19,27 +19,40 @@ Privacy guarantees:
 
 import os
 import re
-from typing import Optional, Any
+from typing import Any
 
 SENTRY_DSN_ENV = "SENTRY_DSN"
 _sentry_initialized = False
 
 # Keys considered sensitive regardless of case or nesting.
 _SENSITIVE_KEY_PATTERNS = {
-    "authorization", "auth",
-    "cookie", "set-cookie", "cookies",
-    "password", "passwd",
+    "authorization",
+    "auth",
+    "cookie",
+    "set-cookie",
+    "cookies",
+    "password",
+    "passwd",
     "secret",
-    "token", "api_token", "access_token", "refresh_token",
-    "api_key", "apikey", "x-api-key",
-    "openai", "open_ai",
+    "token",
+    "api_token",
+    "access_token",
+    "refresh_token",
+    "api_key",
+    "apikey",
+    "x-api-key",
+    "openai",
+    "open_ai",
     "anthropic",
     "deepseek",
     "supabase",
-    "database_url", "db_url",
-    "db_password", "db_pass",
+    "database_url",
+    "db_url",
+    "db_password",
+    "db_pass",
     "dsn",
-    "private_key", "secret_key",
+    "private_key",
+    "secret_key",
     "email",
     "phone",
 }
@@ -48,10 +61,10 @@ _SENSITIVE_KEY_PATTERNS = {
 _SECRET_REGEX = re.compile(
     r"((?:Bearer|Basic)\s+)[^\s,;'\"]+|"
     r"(?:postgres|postgresql|mysql|mongodb|redis)://\S+|"
-    r"(?:https?://)[^\s]*@[^\s]+|"                     # credential URL: https://user:pass@host
+    r"(?:https?://)[^\s]*@[^\s]+|"  # credential URL: https://user:pass@host
     r"(?:sk-|sk-ant-)[a-zA-Z0-9_-]{20,}|"
     r"\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+|"  # JWT
-    r"(?:password|api_key|token)=\S+",                 # password=/api_key=/token= in text
+    r"(?:password|api_key|token)=\S+",  # password=/api_key=/token= in text
     re.IGNORECASE,
 )
 
@@ -67,6 +80,7 @@ def _get_secret(key: str) -> str:
     if not value:
         try:
             import streamlit as st
+
             value = st.secrets.get(key) or ""
         except Exception:
             pass
@@ -245,14 +259,15 @@ def init_monitoring() -> bool:
 
 def capture_error(
     message: str,
-    exception: Optional[BaseException] = None,
-    extra: Optional[dict] = None,
+    exception: BaseException | None = None,
+    extra: dict | None = None,
 ) -> None:
     """Capture an error in Sentry (safe text only — no raw provider data)."""
     if not _sentry_initialized:
         return
     try:
         import sentry_sdk
+
         with sentry_sdk.push_scope() as scope:
             if extra:
                 for key, value in extra.items():

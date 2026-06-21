@@ -1,7 +1,7 @@
-import os
-import json
 import base64
-from typing import Dict, Any, Optional, Tuple, List
+import json
+import os
+from typing import Any, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -9,10 +9,14 @@ from openai import OpenAI
 try:
     from error_monitor import capture_error
 except Exception:
-    def capture_error(*args, **kwargs): pass  # no-op fallback
+
+    def capture_error(*args, **kwargs):
+        pass  # no-op fallback
+
 
 try:
     from anthropic import Anthropic
+
     HAVE_ANTHROPIC = True
 except Exception:
     Anthropic = None
@@ -33,7 +37,8 @@ Lang = str
 # Secrets / Clients
 # =========================
 
-def get_secret_value(key: str) -> Optional[str]:
+
+def get_secret_value(key: str) -> str | None:
     value = os.environ.get(key)
 
     try:
@@ -55,7 +60,7 @@ def get_ai_provider() -> str:
     return provider
 
 
-def get_openai_client() -> Optional[OpenAI]:
+def get_openai_client() -> OpenAI | None:
     api_key = get_secret_value("OPENAI_API_KEY")
 
     if not api_key:
@@ -64,7 +69,7 @@ def get_openai_client() -> Optional[OpenAI]:
     return OpenAI(api_key=api_key)
 
 
-def get_deepseek_client() -> Optional[OpenAI]:
+def get_deepseek_client() -> OpenAI | None:
     api_key = get_secret_value("DEEPSEEK_API_KEY")
 
     if not api_key:
@@ -76,27 +81,20 @@ def get_deepseek_client() -> Optional[OpenAI]:
     )
 
 
-def get_openai_model(model: Optional[str] = None) -> str:
-    return (
-        model
-        or get_secret_value("OPENAI_MODEL")
-        or "gpt-4o-mini"
-    )
+def get_openai_model(model: str | None = None) -> str:
+    return model or get_secret_value("OPENAI_MODEL") or "gpt-4o-mini"
 
 
-def get_deepseek_model(model: Optional[str] = None) -> str:
-    return (
-        model
-        or get_secret_value("DEEPSEEK_MODEL")
-        or "deepseek-chat"
-    )
+def get_deepseek_model(model: str | None = None) -> str:
+    return model or get_secret_value("DEEPSEEK_MODEL") or "deepseek-chat"
 
 
 # =========================
 # Common Helpers
 # =========================
 
-def safe_json_loads(text: str) -> Dict[str, Any]:
+
+def safe_json_loads(text: str) -> dict[str, Any]:
     try:
         data = json.loads(text)
 
@@ -109,7 +107,7 @@ def safe_json_loads(text: str) -> Dict[str, Any]:
         return {}
 
 
-def usage_from_response(response, provider: str) -> Dict[str, Any]:
+def usage_from_response(response, provider: str) -> dict[str, Any]:
     usage = getattr(response, "usage", None)
     model = getattr(response, "model", None)
 
@@ -125,7 +123,7 @@ def usage_from_response(response, provider: str) -> Dict[str, Any]:
     }
 
 
-def mock_usage(model: Optional[str] = None, provider: str = "mock") -> Dict[str, Any]:
+def mock_usage(model: str | None = None, provider: str = "mock") -> dict[str, Any]:
     return {
         "model": model or provider,
         "prompt_tokens": None,
@@ -259,10 +257,7 @@ def repair_explanation_text(
         "If the text contains self-deprecating or insulting animal wording, make the explanation neutral and do not add animal-based alternatives.\n"
         f"{get_output_rule(native_lang)}"
     )
-    user_prompt = (
-        "Repair this explanation text. Return only the repaired text, no markdown fences.\n\n"
-        f"{text}"
-    )
+    user_prompt = f"Repair this explanation text. Return only the repaired text, no markdown fences.\n\n{text}"
     repaired, _ = call_plain_chat(
         model=model,
         system_prompt=system_prompt,
@@ -372,7 +367,7 @@ def get_output_rule(lang: str) -> str:
     return rules.get(lang, "Use the requested output language only.")
 
 
-def persona_instructions(persona_profile: Dict[str, Any]) -> str:
+def persona_instructions(persona_profile: dict[str, Any]) -> str:
     if not persona_profile:
         return ""
 
@@ -396,12 +391,13 @@ Regional / cultural guidelines:
 # Provider Calls
 # =========================
 
+
 def _call_openai_json(
     model: str,
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     client = get_openai_client()
 
     if not client:
@@ -428,7 +424,7 @@ def _call_deepseek_json(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     client = get_deepseek_client()
 
     if not client:
@@ -455,7 +451,7 @@ def _call_openai_plain(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[str, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any]]:
     client = get_openai_client()
 
     if not client:
@@ -479,7 +475,7 @@ def _call_deepseek_plain(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[str, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any]]:
     client = get_deepseek_client()
 
     if not client:
@@ -502,6 +498,7 @@ def _call_deepseek_plain(
 # Anthropic / Claude
 # =========================
 
+
 def get_anthropic_client() -> Optional["Anthropic"]:
     if not HAVE_ANTHROPIC:
         return None
@@ -511,12 +508,8 @@ def get_anthropic_client() -> Optional["Anthropic"]:
     return Anthropic(api_key=api_key)
 
 
-def get_anthropic_model(model: Optional[str] = None) -> str:
-    return (
-        model
-        or get_secret_value("ANTHROPIC_MODEL")
-        or "claude-sonnet-4-20250514"
-    )
+def get_anthropic_model(model: str | None = None) -> str:
+    return model or get_secret_value("ANTHROPIC_MODEL") or "claude-sonnet-4-20250514"
 
 
 def _call_anthropic_json(
@@ -524,7 +517,7 @@ def _call_anthropic_json(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     client = get_anthropic_client()
     if not client:
         raise RuntimeError("Anthropic API key is missing.")
@@ -539,9 +532,11 @@ def _call_anthropic_json(
         ],
     )
 
-    content = "".join(
-        block.text for block in response.content if block.type == "text"
-    ) if hasattr(response.content, "__iter__") else (response.content[0].text if response.content else "")
+    content = (
+        "".join(block.text for block in response.content if block.type == "text")
+        if hasattr(response.content, "__iter__")
+        else (response.content[0].text if response.content else "")
+    )
 
     data = safe_json_loads(content)
     usage_obj = getattr(response, "usage", None)
@@ -559,7 +554,7 @@ def _call_anthropic_plain(
     system_prompt: str,
     user_prompt: str,
     temperature: float,
-) -> Tuple[str, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any]]:
     client = get_anthropic_client()
     if not client:
         raise RuntimeError("Anthropic API key is missing.")
@@ -574,9 +569,11 @@ def _call_anthropic_plain(
         ],
     )
 
-    content = "".join(
-        block.text for block in response.content if block.type == "text"
-    ) if hasattr(response.content, "__iter__") else (response.content[0].text if response.content else "")
+    content = (
+        "".join(block.text for block in response.content if block.type == "text")
+        if hasattr(response.content, "__iter__")
+        else (response.content[0].text if response.content else "")
+    )
 
     usage_obj = getattr(response, "usage", None)
     usage = {
@@ -593,12 +590,9 @@ def call_json_chat(
     system_prompt: str,
     user_prompt: str,
     temperature: float = 0.4,
-) -> Tuple[Dict[str, Any], Dict[str, Any], str]:
+) -> tuple[dict[str, Any], dict[str, Any], str]:
     system_prompt = (
-        system_prompt
-        + "\nReturn valid JSON only. Do not include markdown."
-        + "\n"
-        + strict_language_guard()
+        system_prompt + "\nReturn valid JSON only. Do not include markdown." + "\n" + strict_language_guard()
     )
 
     provider = get_ai_provider()
@@ -676,7 +670,7 @@ def call_plain_chat(
     system_prompt: str,
     user_prompt: str,
     temperature: float = 0.4,
-) -> Tuple[str, Dict[str, Any]]:
+) -> tuple[str, dict[str, Any]]:
     system_prompt = system_prompt + "\n" + strict_language_guard()
     provider = get_ai_provider()
 
@@ -727,15 +721,16 @@ def call_plain_chat(
 # Language Detection
 # =========================
 
+
 def detect_language_simple(
     text: str,
     model: str,
     temperature: float,
-    persona_profile: Dict[str, Any],
-) -> Optional[str]:
+    persona_profile: dict[str, Any],
+) -> str | None:
     system_prompt = (
         "You are a strict language detector. "
-        "Return JSON only: {\"lang\":\"zh|yue|ko|ja|en\"}.\n"
+        'Return JSON only: {"lang":"zh|yue|ko|ja|en"}.\n'
         "Do not translate the text.\n"
         "If the text is Latin letters but resembles Mandarin pinyin, return zh.\n"
         "If it resembles Cantonese Jyutping/romanization, especially with tone numbers like ngo5 or m4 goi1, return yue.\n"
@@ -773,6 +768,7 @@ def detect_language_simple(
 # Translation
 # =========================
 
+
 def translate_text(
     text: str,
     source_lang: Lang,
@@ -780,8 +776,8 @@ def translate_text(
     native_lang: Lang,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[str, Dict[str, Any], Optional[str]]:
+    persona_profile: dict[str, Any],
+) -> tuple[str, dict[str, Any], str | None]:
     detected = None
 
     if source_lang == "auto":
@@ -836,14 +832,15 @@ def translate_text(
 # Meaning Analysis
 # =========================
 
+
 def explain_message_meaning(
     text: str,
     source_lang: Lang,
     native_lang: Lang,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     detected = None
 
     if source_lang == "auto":
@@ -901,6 +898,7 @@ def explain_message_meaning(
 # Grammar
 # =========================
 
+
 def correct_grammar(
     text: str,
     target_lang: Lang,
@@ -908,8 +906,8 @@ def correct_grammar(
     level: str,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     system_prompt = (
         "You are a grammar coach for multilingual learners.\n"
         f"{language_rules()}\n"
@@ -961,6 +959,7 @@ def correct_grammar(
 # Natural Expression
 # =========================
 
+
 def suggest_natural_expression(
     text: str,
     target_lang: Lang,
@@ -968,8 +967,8 @@ def suggest_natural_expression(
     tone_preference: str,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     system_prompt = (
         "You are a natural expression coach. "
         "Improve the user's sentence so it sounds natural.\n"
@@ -1020,6 +1019,7 @@ def suggest_natural_expression(
 # Vocabulary
 # =========================
 
+
 def explain_vocabulary(
     text: str,
     target_lang: Lang,
@@ -1027,8 +1027,8 @@ def explain_vocabulary(
     max_items: int,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     system_prompt = (
         "You are a vocabulary and phrase explainer.\n"
         f"{language_rules()}\n"
@@ -1074,14 +1074,15 @@ def explain_vocabulary(
 # Tone Analysis
 # =========================
 
+
 def analyze_tone(
     text: str,
     lang: Lang,
     native_lang: Lang,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
     system_prompt = (
         "You are a tone and intent analyzer.\n"
         f"{language_rules()}\n"
@@ -1127,6 +1128,7 @@ def analyze_tone(
 # Advanced Chat Coach
 # =========================
 
+
 def chat_reply_coach_advanced(
     text: str,
     source_lang: Lang,
@@ -1135,9 +1137,9 @@ def chat_reply_coach_advanced(
     reply_style: str,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-    conversation_context: Optional[List[Dict[str, str]]] = None,
-) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+    persona_profile: dict[str, Any],
+    conversation_context: list[dict[str, str]] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     detected = None
 
     if source_lang == "auto":
@@ -1191,8 +1193,7 @@ def chat_reply_coach_advanced(
 
     if conversation_context:
         prompt["conversation_history"] = [
-            {"role": turn.get("role", "user"), "content": turn.get("text", "")}
-            for turn in conversation_context
+            {"role": turn.get("role", "user"), "content": turn.get("text", "")} for turn in conversation_context
         ]
 
     data, usage, raw = call_json_chat(
@@ -1244,6 +1245,7 @@ def chat_reply_coach_advanced(
 # Media Context
 # =========================
 
+
 def media_context_explain(
     text: str,
     source_lang: Lang,
@@ -1251,8 +1253,8 @@ def media_context_explain(
     context_type: str,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     detected = None
 
     if source_lang == "auto":
@@ -1321,17 +1323,18 @@ def media_context_explain(
 # Screenshot Chat Analysis
 # =========================
 
+
 def analyze_screenshot_chat(
     image_bytes: bytes,
     image_name: str,
-    assumed_lang: Optional[str],
+    assumed_lang: str | None,
     native_lang: str,
     target_lang: str,
     region_mode: str,
     temperature: float,
     model: str,
-    persona_profile: Dict[str, Any],
-) -> Tuple[Dict[str, Any], Dict[str, Any], Optional[str]]:
+    persona_profile: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], str | None]:
     openai_client = get_openai_client()
 
     # Localized error texts for screenshot analysis

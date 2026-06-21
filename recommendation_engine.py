@@ -8,8 +8,7 @@ Usage:
     recs = get_recommendations(username, native_lang, target_lang, ...)
 """
 
-from typing import Dict, Any, List, Optional
-
+from typing import Any
 
 # ── Feature catalogue ──────────────────────────────────────────
 
@@ -75,6 +74,7 @@ _FEATURES = [
 
 # ── Scoring helpers ────────────────────────────────────────────
 
+
 def _language_goal_score(feature_id: str, target_lang: str) -> float:
     """How well the feature matches the user's target language (0.0–1.0)."""
     if feature_id == "kpop":
@@ -86,7 +86,7 @@ def _language_goal_score(feature_id: str, target_lang: str) -> float:
 
 def _preference_score(
     feature_id: str,
-    mode_counts: Dict[str, int],
+    mode_counts: dict[str, int],
     vocab_item_count: int,
     show_pron: bool,
     target_lang: str,
@@ -116,7 +116,7 @@ def _preference_score(
     return 0.3
 
 
-def _activity_score(feature_id: str, mode_counts: Dict[str, int], total: int) -> float:
+def _activity_score(feature_id: str, mode_counts: dict[str, int], total: int) -> float:
     """How actively the user engages with related features (0.0–1.0)."""
     if total == 0:
         return 0.3
@@ -146,15 +146,16 @@ def _activity_score(feature_id: str, mode_counts: Dict[str, int], total: int) ->
 
 # ── Public API ─────────────────────────────────────────────────
 
+
 def get_recommendations(
     username: str,
     native_lang: str,
     target_lang: str,
-    mode_counts: Optional[Dict[str, int]] = None,
+    mode_counts: dict[str, int] | None = None,
     vocab_item_count: int = 0,
     show_pron: bool = False,
     max_results: int = 3,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return the top-N recommended features for a user.
 
     Args:
@@ -171,7 +172,7 @@ def get_recommendations(
     """
     total = sum((mode_counts or {}).values())
 
-    scored: List[Dict[str, Any]] = []
+    scored: list[dict[str, Any]] = []
     for feature in _FEATURES:
         fid = feature["id"]
         mc = mode_counts or {}
@@ -181,15 +182,17 @@ def get_recommendations(
 
         overall = ls * 0.50 + ps * 0.30 + act * 0.20
 
-        scored.append({
-            **feature,
-            "score": round(overall, 2),
-            "breakdown": {
-                "goal": round(ls * 0.50, 2),
-                "preference": round(ps * 0.30, 2),
-                "activity_momentum": round(act * 0.20, 2),
-            },
-        })
+        scored.append(
+            {
+                **feature,
+                "score": round(overall, 2),
+                "breakdown": {
+                    "goal": round(ls * 0.50, 2),
+                    "preference": round(ps * 0.30, 2),
+                    "activity_momentum": round(act * 0.20, 2),
+                },
+            }
+        )
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored[:max_results]

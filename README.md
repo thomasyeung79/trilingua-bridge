@@ -20,6 +20,9 @@
   <img src="https://img.shields.io/badge/AI-OpenAI%20%7C%20Anthropic%20%7C%20DeepSeek-blueviolet" alt="Multi-provider AI">
   <img src="https://img.shields.io/badge/PWA-ready-blue" alt="PWA ready">
   <br>
+  <img src="https://img.shields.io/badge/CI-passing-brightgreen" alt="CI passing">
+  <img src="https://img.shields.io/badge/tests-131%20passed-success" alt="131 tests passing">
+  <br>
   <a href="docs/architecture.md">📐 Architecture</a> ·
   <a href="CHANGELOG.md">📋 Changelog</a> ·
   <a href="CONTRIBUTING.md">🤝 Contributing</a> ·
@@ -41,7 +44,7 @@ TriLingua Bridge helps language learners write natural, culturally appropriate m
 
 It is not a translation tool. It is a **communication coach**: you describe the situation, and it helps you craft a reply that sounds natural — with tone analysis, cultural notes, pronunciation guides, and vocabulary explanations built in.
 
-**Live demo:** Demo available upon request
+**Live demo:** Coming soon — Streamlit Cloud deployment in progress
 **Demo video:** Demo available upon request
 
 ---
@@ -292,6 +295,51 @@ python run.py --no-browser   # Don't auto-open
 run.bat
 ```
 
+### Deploy to Streamlit Cloud
+
+TriLingua Bridge can be deployed to Streamlit Cloud for free.
+
+**Requirements:**
+- A [Streamlit Cloud](https://streamlit.io/cloud) account
+- At least one AI provider API key (OpenAI, Anthropic, or DeepSeek)
+
+**Steps:**
+
+1. Push the repository to GitHub (already configured):
+
+   ```bash
+   git remote set-url origin https://github.com/thomasyeung79/trilingua-bridge.git
+   git push origin main
+   ```
+
+2. Go to [share.streamlit.io](https://share.streamlit.io) and click **"New app"**.
+
+3. Connect your GitHub repository and set the **main file path** to `app.py`.
+
+4. Under **Advanced settings**, set **Python version** to `3.11`.
+
+5. Add the following **Secrets** (click "⋮" → "Edit Secrets"):
+
+   ```toml
+   OPENAI_API_KEY = "sk-..."
+   # ANTHROPIC_API_KEY = "sk-ant-..."   # optional
+   # DEEPSEEK_API_KEY = "sk-..."        # optional
+   AI_PROVIDER = "auto"
+   DEPLOY_MODE = "demo"
+   ```
+
+6. Click **"Deploy"** and wait ~3–5 minutes for the first build.
+
+7. Your app will be available at `https://<your-app-name>.streamlit.app`.
+
+**Important notes:**
+
+- Streamlit Cloud uses an **ephemeral filesystem**. The SQLite database resets on every app restart, deploy, and idle timeout.
+- This is acceptable for a portfolio demo but **do not use real passwords** on the deployed instance.
+- Setting `DEPLOY_MODE = "demo"` in Secrets enables a banner informing visitors of the ephemeral-storage limitation.
+- The `.gitignore` file excludes `.env`, `*.db`, and `.streamlit/secrets.toml` — your credentials are safe.
+- Audio features (TTS, STT) require a valid `OPENAI_API_KEY`. Without it, the app degrades gracefully.
+
 ---
 
 ## 📁 Project Structure
@@ -420,7 +468,7 @@ pytest --cov=. tests/
 - ⬜ Extract inline CSS to static stylesheet
 - ⬜ Add mypy type checking
 - ⬜ Increase test coverage (>30%)
-- ⬜ Public CI pipeline (GitHub Actions) — local checks run before release commits
+- ✅ Public CI pipeline (GitHub Actions) — runs Ruff lint, Ruff format check, and pytest on push/PR
 
 ---
 

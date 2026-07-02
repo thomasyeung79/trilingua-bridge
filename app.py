@@ -142,7 +142,7 @@ if is_demo_mode():
 page = st.session_state.page
 username = st.session_state.username
 
-if page != "Home" and not username:
+if page != "Home" and page != "About" and not username:
     st.session_state.page = "Home"
     st.rerun()
 

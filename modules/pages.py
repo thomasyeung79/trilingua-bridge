@@ -1744,6 +1744,10 @@ def render_home_dashboard():
             )
         )
 
+        if st.button("📖 " + ui_text("landing_about_link", "About TriLingua Bridge"), use_container_width=True, key="landing_about_btn"):
+            st.session_state.page = "About"
+            st.rerun()
+
         # ── Auth section (below CTA — preserved as-is) ──
         st.divider()
         with ui_panel():
@@ -2748,9 +2752,209 @@ def render_history_page(username: str):
 
 
 def render_about_page():
-    go_home_button()
-    section_header(t("about_title"))
-    st.write(t("about_desc"))
+    """Professional landing page for TriLingua Bridge public beta."""
+
+    # ── Back navigation ──
+    _back_label = ui_text("back_home", "Back to Home")
+    if st.button(f"🏠 {_back_label}", key="about_back_home", use_container_width=True):
+        st.session_state.page = "Home"
+        st.rerun()
+
+    # ── Hero Section ──
+    st.markdown(
+        """
+        <div style="text-align:center;padding:2rem 1rem 1.5rem;">
+            <div style="font-size:2.5rem;line-height:1.15;font-weight:850;letter-spacing:-0.02em;margin-bottom:0.6rem;">
+                🌐 TriLingua Bridge
+            </div>
+            <div style="font-size:1.15rem;color:#4b5563;max-width:600px;margin:0 auto 1.5rem;line-height:1.6;">
+                AI-powered multilingual communication assistant.<br>
+                Not just translation — tone, cultural context, and "would a native actually say this?" feedback.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.link_button("View on GitHub →", "https://github.com/thomasyeung79/trilingua-bridge", use_container_width=True)
+
+    st.divider()
+
+    # ── Supported Languages ──
+    st.markdown(
+        """
+        <div style="text-align:center;padding:0.5rem 0 1.5rem;">
+            <div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:0.05em;margin-bottom:0.8rem;">Supported languages</div>
+            <div style="display:flex;gap:0.6rem;justify-content:center;flex-wrap:wrap;">
+                <span style="background:#eef5ff;color:#2563eb;border-radius:999px;padding:0.35rem 1rem;font-weight:600;">中文 (Mandarin)</span>
+                <span style="background:#ecfdf5;color:#0f766e;border-radius:999px;padding:0.35rem 1rem;font-weight:600;">Cantonese (粤语)</span>
+                <span style="background:#fef3c7;color:#b45309;border-radius:999px;padding:0.35rem 1rem;font-weight:600;">한국어 (Korean)</span>
+                <span style="background:#fce7f3;color:#be185d;border-radius:999px;padding:0.35rem 1rem;font-weight:600;">日本語 (Japanese)</span>
+                <span style="background:#ecfdf5;color:#0f766e;border-radius:999px;padding:0.35rem 1rem;font-weight:600;">English</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ── Features Grid ──
+    st.markdown(
+        """
+        <div style="font-size:1.4rem;font-weight:800;margin:2rem 0 1rem;">Core Features</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    features = [
+        ("🎯", "AI Chat Coach", "Region-aware reply suggestions with tone analysis, cultural notes, and pronunciation guides across 5 regional modes."),
+        ("🌐", "Translation", "Context-aware AI translation with native-language explanations for the user's target language."),
+        ("✍️", "Grammar & Natural Expression", "Level-based grammar correction and natural expression rewriting — turn textbook language into natural conversation."),
+        ("📚", "Vocabulary & Review", "Save phrases to a personal vocab bank, review saved corrections, and track your learning progress over time."),
+        ("📊", "Learning Report", "Points, streak tracking, weekly charts, and mode analytics to visualise your learning journey."),
+        ("🎤", "Voice & Pronunciation", "Speech-to-text via Whisper, text-to-speech, and romanisation for all 5 languages (Pinyin, Jyutping, Hangul, Hepburn, IPA)."),
+    ]
+
+    for i in range(0, len(features), 2):
+        cols = st.columns(2)
+        for j, (icon, title, desc) in enumerate(features[i : i + 2]):
+            with cols[j]:
+                st.markdown(
+                    f"""
+                    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:1.25rem;height:100%;background:white;">
+                        <div style="font-size:1.8rem;margin-bottom:0.4rem;">{icon}</div>
+                        <div style="font-weight:700;font-size:1.05rem;margin-bottom:0.35rem;">{title}</div>
+                        <div style="color:#6b7280;font-size:0.9rem;line-height:1.5;">{desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    st.divider()
+
+    # ── Technology Stack ──
+    st.markdown(
+        """
+        <div style="font-size:1.4rem;font-weight:800;margin:1.5rem 0 0.2rem;">Technology</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tech_data = [
+        ("🐍", "Python 3.11+", "Core application logic and AI orchestration"),
+        ("📡", "Streamlit", "Rapid AI UX prototyping with built-in state management"),
+        ("🗄️", "PostgreSQL + Supabase", "Persistent data storage with zero-infrastructure local fallback (SQLite)"),
+        ("🤖", "OpenAI / Anthropic / DeepSeek", "Multi-provider AI with automatic fallback for supported text AI tasks"),
+    ]
+    for i in range(0, len(tech_data), 2):
+        row_cols = st.columns(2)
+        for col, (icon, title, desc) in zip(row_cols, tech_data[i : i + 2]):
+            with col:
+                st.markdown(
+                    f"""
+                    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;height:100%;background:white;">
+                        <div style="font-size:1.5rem;">{icon}</div>
+                        <div style="font-weight:700;font-size:0.9rem;margin:0.3rem 0 0.2rem;">{title}</div>
+                        <div style="color:#6b7280;font-size:0.8rem;line-height:1.4;">{desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    # ── AI Providers ──
+    st.markdown(
+        """
+        <div style="font-size:1.4rem;font-weight:800;margin:2rem 0 0.2rem;">AI Providers</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    provider_cols = st.columns(3)
+    provider_data = [
+        ("🟢", "OpenAI", "Primary provider — gpt-4o-mini for text, Whisper for speech, TTS for voice output"),
+        ("🟣", "Anthropic Claude", "First fallback — Claude Sonnet for high-quality text generation"),
+        ("🔵", "DeepSeek", "Second fallback — DeepSeek Chat for cost-effective text generation"),
+    ]
+    for col, (icon, title, desc) in zip(provider_cols, provider_data):
+        with col:
+            st.markdown(
+                f"""
+                <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;height:100%;background:white;">
+                    <div style="font-weight:700;font-size:1rem;">{icon} {title}</div>
+                    <div style="color:#6b7280;font-size:0.8rem;line-height:1.4;margin-top:0.3rem;">{desc}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    st.divider()
+
+    # ── Privacy Section ──
+    st.markdown(
+        """
+        <div style="font-size:1.4rem;font-weight:800;margin:1.5rem 0 0.2rem;">Privacy-First Design</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    privacy_data = [
+        ("🔒", "Password Security", "PBKDF2-HMAC-SHA256 with 120k iterations and per-user salt"),
+        ("🔑", "API Key Protection", "Keys read from environment only, never logged or exposed"),
+        ("🛡️", "Data Storage", "User data stored in PostgreSQL. Local SQLite fallback for development"),
+        ("📋", "Safe Monitoring", "Privacy-hardened Sentry monitoring with PII and secret redaction"),
+    ]
+    for i in range(0, len(privacy_data), 2):
+        row_cols = st.columns(2)
+        for col, (icon, title, desc) in zip(row_cols, privacy_data[i : i + 2]):
+            with col:
+                st.markdown(
+                    f"""
+                    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:1rem;text-align:center;height:100%;background:white;">
+                        <div style="font-size:1.5rem;">{icon}</div>
+                        <div style="font-weight:700;font-size:0.9rem;margin:0.3rem 0 0.2rem;">{title}</div>
+                        <div style="color:#6b7280;font-size:0.8rem;line-height:1.4;">{desc}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+    st.divider()
+
+    # ── Screenshots ──
+    st.markdown(
+        """
+        <div style="font-size:1.4rem;font-weight:800;margin:1.5rem 0 0.2rem;">Screenshots</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    ss_col1, ss_col2 = st.columns(2)
+    with ss_col1:
+        st.image("docs/screenshots/coach.png", caption="AI Chat Coach", use_container_width=True)
+    with ss_col2:
+        st.image("docs/screenshots/translate.png", caption="Translation", use_container_width=True)
+
+    ss_col3, ss_col4 = st.columns(2)
+    with ss_col3:
+        st.image("docs/screenshots/review.png", caption="Review Book", use_container_width=True)
+    with ss_col4:
+        st.image("docs/screenshots/report.png", caption="Learning Report", use_container_width=True)
+
+    st.divider()
+
+    # ── Footer ──
+    st.markdown(
+        f"""
+        <div style="text-align:center;padding:1.5rem 0;color:#9ca3af;font-size:0.85rem;">
+            <div style="font-weight:700;color:#374151;font-size:1rem;margin-bottom:0.4rem;">🌐 TriLingua Bridge</div>
+            <div style="margin-bottom:0.6rem;">
+                <a href="https://github.com/thomasyeung79/trilingua-bridge" target="_blank" style="color:#6b7280;text-decoration:none;">GitHub</a>
+                &nbsp;·&nbsp;
+                <a href="https://github.com/thomasyeung79/trilingua-bridge/blob/main/LICENSE" target="_blank" style="color:#6b7280;text-decoration:none;">MIT License</a>
+            </div>
+            <div>© 2026 Thomas Yeung</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # ═══════════════════════════════════════════════════

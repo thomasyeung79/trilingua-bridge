@@ -66,8 +66,13 @@ def _get_pg_config() -> dict:
 
 
 def _use_postgres() -> bool:
-    """Check whether to use PostgreSQL (Supabase) instead of SQLite."""
-    return os.environ.get("USE_POSTGRES", "false").lower() == "true"
+    """Check whether to use PostgreSQL (Supabase) instead of SQLite.
+
+    Reads from environment variables or Streamlit secrets.
+    Accepts true, True, TRUE, etc. Defaults to false.
+    """
+    val = _get_secret("USE_POSTGRES")
+    return val.strip().lower() == "true"
 
 
 def _placeholder() -> str:
@@ -151,6 +156,35 @@ def get_connection():
 
 
 def init_db():
+    """Initialise database tables.
+
+    For PostgreSQL, retries up to 3 times for transient connection failures
+    (1s, then 2s back-off). Configuration errors are not retried.
+    SQLite behaviour is unchanged.
+    """
+    if not _use_postgres():
+        _run_init()
+        return
+
+    # PostgreSQL: bounded retry for transient failures
+    import time
+
+    last_exc = None
+    for attempt in range(3):
+        try:
+            _run_init()
+            return  # success
+        except RuntimeError:
+            raise  # configuration error — do not retry
+        except Exception as exc:
+            last_exc = exc
+            if attempt < 2:
+                time.sleep(1 + attempt)  # 1s, then 2s
+    raise last_exc  # type: ignore[misc]
+
+
+def _run_init():
+    """Execute a single database initialisation attempt."""
     conn = get_connection()
 
     try:

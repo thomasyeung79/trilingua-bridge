@@ -6,8 +6,9 @@ Imports page rendering from modules/ and dispatches via st.session_state.page.
 import streamlit as st
 from dotenv import load_dotenv
 
+import db_helper
 from db_helper import ensure_history_columns, init_db
-from error_monitor import init_monitoring
+from error_monitor import capture_error, init_monitoring
 from modules.pages import (
     init_state,
     is_demo_mode,
@@ -118,14 +119,12 @@ def _init_db_once():
 
 try:
     _init_db_once()
-except Exception:
+except Exception as exc:
     st.error(t("db_init_failed"))
-    try:
-        from error_monitor import capture_error
-
-        capture_error("Database init failed at startup")
-    except Exception:
-        pass
+    # Report actual error type to Sentry without exposing sensitive details
+    err_type = type(exc).__name__
+    has_pg = db_helper._use_postgres()
+    capture_error("database_init_failure", extra={"error_type": err_type, "postgres_mode": has_pg})
     st.stop()
 
 # ── Demo mode banner ─────────────────────────────

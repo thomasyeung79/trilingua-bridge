@@ -159,16 +159,24 @@ def init_db():
     """Initialise database tables.
 
     For PostgreSQL, retries up to 3 times for transient connection failures
-    (1s, then 2s back-off). Configuration errors are not retried.
-    SQLite behaviour is unchanged.
+    (1s, then 2s back-off). SQLite also retries brief lock contention that can
+    happen when multiple Streamlit sessions start at the same time.
+    Configuration errors and non-locking SQLite errors are not retried.
     """
     if not _use_postgres():
-        _run_init()
-        return
+        last_exc = None
+        for attempt in range(3):
+            try:
+                _run_init()
+                return
+            except sqlite3.OperationalError as exc:
+                last_exc = exc
+                if not _is_sqlite_lock_error(exc) or attempt == 2:
+                    raise
+                time.sleep(0.2 * (attempt + 1))
+        raise last_exc  # pragma: no cover
 
     # PostgreSQL: bounded retry for transient failures
-    import time
-
     last_exc = None
     for attempt in range(3):
         try:
@@ -181,6 +189,12 @@ def init_db():
             if attempt < 2:
                 time.sleep(1 + attempt)  # 1s, then 2s
     raise last_exc  # type: ignore[misc]
+
+
+def _is_sqlite_lock_error(exc: BaseException) -> bool:
+    """Return whether an SQLite error represents temporary lock contention."""
+    message = str(exc).lower()
+    return "database is locked" in message or "database is busy" in message
 
 
 def _run_init():
@@ -570,19 +584,24 @@ def ensure_history_columns():
     if _use_postgres():
         return
 
-    conn = get_connection()
+    for attempt in range(3):
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA table_info(history);")
+            existing_columns = {row["name"] for row in cursor.fetchall()}
 
-    try:
-        cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(history);")
-        existing_columns = {row["name"] for row in cursor.fetchall()}
+            if "created_at_text" not in existing_columns:
+                cursor.execute("ALTER TABLE history ADD COLUMN created_at_text TEXT;")
 
-        if "created_at_text" not in existing_columns:
-            cursor.execute("ALTER TABLE history ADD COLUMN created_at_text TEXT;")
-
-        conn.commit()
-    finally:
-        conn.close()
+            conn.commit()
+            return
+        except sqlite3.OperationalError as exc:
+            if not _is_sqlite_lock_error(exc) or attempt == 2:
+                raise
+            time.sleep(0.2 * (attempt + 1))
+        finally:
+            conn.close()
 
 
 # ── History ────────────────────────────────────────────────────

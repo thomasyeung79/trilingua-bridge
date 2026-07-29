@@ -31,6 +31,14 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from socketserver import ThreadingTCPServer
 
+# Windows may select a legacy console encoding (for example GBK), especially
+# when this launcher is started in the background with redirected output.
+# The status messages below contain Unicode symbols, so normalise the streams
+# before printing anything to prevent the launcher from crashing at startup.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # ── Config ────────────────────────────────────────────────────
 ROOT = Path(__file__).resolve().parent
 PWA_DIR = ROOT / "pwa"
@@ -294,11 +302,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
             backend.close()
             return
 
-        # Send 101 Switching Protocols back to client
-        self.send_response(101)
-        self.end_headers()
-
-        # Bidirectional copy
+        # Streamlit sends the real 101 response, including the negotiated
+        # Sec-WebSocket-Accept header. Tunnel that response unchanged; emitting
+        # our own 101 here would create two handshakes on the client socket and
+        # leave the Streamlit page permanently blank.
         self._pipe_sockets(client, backend)
 
     def _pipe_sockets(self, client, backend):

@@ -120,10 +120,12 @@ def _init_db_once():
 try:
     _init_db_once()
 except Exception as exc:
-    st.error(t("db_init_failed"))
-    # Report actual error type to Sentry without exposing sensitive details
     err_type = type(exc).__name__
     has_pg = db_helper._use_postgres()
+    st.error(t("db_init_failed"))
+    # Show error category (safe — no credentials) as a caption for diagnostics
+    st.caption(f"Error type: {err_type} · PostgreSQL: {'on' if has_pg else 'off'}")
+    # Report to Sentry without exposing sensitive details
     capture_error("database_init_failure", extra={"error_type": err_type, "postgres_mode": has_pg})
     st.stop()
 

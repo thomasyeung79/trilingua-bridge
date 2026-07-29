@@ -648,6 +648,17 @@ def test_init_db_has_retry_for_pg():
     assert "time.sleep(1 + attempt)" in content, "retry must have exponential back-off"
 
 
+def test_sqlite_lock_error_detection():
+    """Only temporary SQLite lock/busy errors are eligible for retry."""
+    import sqlite3
+
+    from db_helper import _is_sqlite_lock_error
+
+    assert _is_sqlite_lock_error(sqlite3.OperationalError("database is locked"))
+    assert _is_sqlite_lock_error(sqlite3.OperationalError("database is busy"))
+    assert not _is_sqlite_lock_error(sqlite3.OperationalError("no such table: history"))
+
+
 def test_app_startup_hides_exception_details():
     """app.py must not expose raw exception details to users."""
     with open("app.py", encoding="utf-8") as f:

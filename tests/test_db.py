@@ -179,7 +179,7 @@ def test_pg_config_raises_without_host(monkeypatch):
     """_get_pg_config() raises RuntimeError when mandatory keys are missing."""
     monkeypatch.setenv("USE_POSTGRES", "true")
     # Clear relevant env vars
-    for k in ["SUPABASE_DB_HOST", "SUPABASE_DB_PASSWORD"]:
+    for k in ["DATABASE_URL", "SUPABASE_DB_URL", "SUPABASE_DB_HOST", "SUPABASE_DB_PASSWORD"]:
         monkeypatch.delenv(k, raising=False)
 
     from db_helper import _get_pg_config
@@ -235,6 +235,30 @@ def test_pg_config_invalid_port_raises(monkeypatch):
         msg = str(e)
         assert "SUPABASE_DB_PORT" in msg
         assert "integer" in msg
+
+
+def test_database_url_enables_postgres(monkeypatch):
+    """A single persistent DATABASE_URL enables PostgreSQL automatically."""
+    monkeypatch.delenv("USE_POSTGRES", raising=False)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:password@db.example.com:6543/postgres")
+
+    from db_helper import _get_pg_config, _use_postgres
+
+    assert _use_postgres() is True
+    assert _get_pg_config()["dsn"].startswith("postgresql://")
+
+
+def test_database_url_rejects_non_postgres_scheme(monkeypatch):
+    """DATABASE_URL must point to PostgreSQL."""
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///temporary.db")
+
+    from db_helper import _get_pg_config
+
+    try:
+        _get_pg_config()
+        assert False, "Expected RuntimeError"
+    except RuntimeError as exc:
+        assert "postgresql://" in str(exc)
 
 
 # ── Duplicate username path (Fix 2) ────────────────────────────
@@ -579,10 +603,12 @@ def test_pg_schema_init_has_advisory_lock():
 
 # ── Database init retry and USE_POSTGRES fix tests ────────────
 
+
 def test_use_postgres_whitespace_handling(monkeypatch):
     """USE_POSTGRES with whitespace is trimmed before comparison."""
     monkeypatch.setenv("USE_POSTGRES", "  true  ")
     from db_helper import _use_postgres
+
     assert _use_postgres() is True
 
 
@@ -590,6 +616,7 @@ def test_use_postgres_case_insensitive_upper(monkeypatch):
     """USE_POSTGRES=TRUE (all caps) returns True."""
     monkeypatch.setenv("USE_POSTGRES", "TRUE")
     from db_helper import _use_postgres
+
     assert _use_postgres() is True
 
 
@@ -597,6 +624,7 @@ def test_use_postgres_empty_string(monkeypatch):
     """USE_POSTGRES= (empty string) returns False."""
     monkeypatch.setenv("USE_POSTGRES", "")
     from db_helper import _use_postgres
+
     assert _use_postgres() is False
 
 
@@ -604,13 +632,12 @@ def test_use_postgres_wrong_value(monkeypatch):
     """USE_POSTGRES=yes returns False."""
     monkeypatch.setenv("USE_POSTGRES", "yes")
     from db_helper import _use_postgres
+
     assert _use_postgres() is False
 
 
 def test_init_db_retry_not_called_for_config_error():
     """RuntimeError from _get_pg_config must NOT be retried by init_db."""
-    import time
-
     call_count = 0
     original_run_init = None
 
@@ -618,9 +645,6 @@ def test_init_db_retry_not_called_for_config_error():
         nonlocal call_count
         call_count += 1
         raise RuntimeError("Missing PostgreSQL configuration")
-
-    from db_helper import _run_init
-    _run_init  # ensure it exists
 
     # Verify that the retry logic in init_db does not retry RuntimeError
     # We do this by inspecting the source — RuntimeError is re-raised immediately
@@ -630,14 +654,13 @@ def test_init_db_retry_not_called_for_config_error():
         content = f.read()
 
     # Check that RuntimeError is raised (not caught and retried)
-    assert "except RuntimeError:\n            raise" in content, (
-        "RuntimeError (config errors) must not be retried"
-    )
+    assert "except RuntimeError:\n            raise" in content, "RuntimeError (config errors) must not be retried"
 
 
 def test_init_db_has_retry_for_pg():
     """init_db contains retry logic for transient PG failures."""
-    from db_helper import init_db, _use_postgres
+    from db_helper import init_db
+
     assert init_db is not None
 
     # Verify the retry logic exists by inspecting the source
@@ -665,11 +688,7 @@ def test_app_startup_hides_exception_details():
         content = f.read()
 
     # Check that st.error uses generic message, not str(exc)
-    assert 'st.error(t("db_init_failed"))' in content, (
-        "app.py must show generic error, not raw exception"
-    )
+    assert 'st.error(t("db_init_failed"))' in content, "app.py must show generic error, not raw exception"
     # Verify sensitive info is not in the user-facing path
     # The capture_error call should send error_type, not str(exc)
-    assert 'extra={"error_type": err_type' in content, (
-        "error type must be captured for Sentry, not raw string"
-    )
+    assert 'extra={"error_type": err_type' in content, "error type must be captured for Sentry, not raw string"

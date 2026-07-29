@@ -42,6 +42,14 @@ def _get_secret(key: str) -> str:
 
 def _get_pg_config() -> dict:
     """Read and validate PostgreSQL configuration from env / Streamlit secrets."""
+    database_url = _get_secret("DATABASE_URL") or _get_secret("SUPABASE_DB_URL")
+    if database_url:
+        if not database_url.startswith(("postgresql://", "postgres://")):
+            raise RuntimeError(
+                "Invalid PostgreSQL configuration: DATABASE_URL must start with postgresql:// or postgres://."
+            )
+        return {"dsn": database_url}
+
     try:
         port = int(_get_secret("SUPABASE_DB_PORT") or "5432")
     except ValueError:
@@ -71,6 +79,8 @@ def _use_postgres() -> bool:
     Reads from environment variables or Streamlit secrets.
     Accepts true, True, TRUE, etc. Defaults to false.
     """
+    if _get_secret("DATABASE_URL") or _get_secret("SUPABASE_DB_URL"):
+        return True
     val = _get_secret("USE_POSTGRES")
     return val.strip().lower() == "true"
 
@@ -114,7 +124,7 @@ def get_connection():
 
     PostgreSQL (USE_POSTGRES=true):
         Returns a psycopg2 connection with RealDictCursor.
-        Configuration via SUPABASE_DB_HOST / _NAME / _USER / _PASSWORD / _PORT.
+        Configuration via DATABASE_URL (preferred) or the SUPABASE_DB_* fields.
 
     SQLite (default):
         Returns a sqlite3 connection with Row factory.
@@ -124,6 +134,15 @@ def get_connection():
         from psycopg2.extras import RealDictCursor
 
         pg_config = _get_pg_config()
+        common_options = {
+            "sslmode": "require",
+            "cursor_factory": RealDictCursor,
+            "connect_timeout": 10,
+            "application_name": "trilingua_bridge",
+        }
+
+        if "dsn" in pg_config:
+            return psycopg2.connect(pg_config["dsn"], **common_options)
 
         return psycopg2.connect(
             host=pg_config["host"],
@@ -131,9 +150,7 @@ def get_connection():
             user=pg_config["user"],
             password=pg_config["password"],
             port=pg_config["port"],
-            sslmode="require",
-            cursor_factory=RealDictCursor,
-            connect_timeout=10,
+            **common_options,
         )
 
     db_path = get_db_path()

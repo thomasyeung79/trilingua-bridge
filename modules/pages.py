@@ -1744,7 +1744,11 @@ def render_home_dashboard():
             )
         )
 
-        if st.button("📖 " + ui_text("landing_about_link", "About TriLingua Bridge"), use_container_width=True, key="landing_about_btn"):
+        if st.button(
+            "📖 " + ui_text("landing_about_link", "About TriLingua Bridge"),
+            use_container_width=True,
+            key="landing_about_btn",
+        ):
             st.session_state.page = "About"
             st.rerun()
 
@@ -2805,12 +2809,36 @@ def render_about_page():
     )
 
     features = [
-        ("🎯", "AI Chat Coach", "Region-aware reply suggestions with tone analysis, cultural notes, and pronunciation guides across 5 regional modes."),
-        ("🌐", "Translation", "Context-aware AI translation with native-language explanations for the user's target language."),
-        ("✍️", "Grammar & Natural Expression", "Level-based grammar correction and natural expression rewriting — turn textbook language into natural conversation."),
-        ("📚", "Vocabulary & Review", "Save phrases to a personal vocab bank, review saved corrections, and track your learning progress over time."),
-        ("📊", "Learning Report", "Points, streak tracking, weekly charts, and mode analytics to visualise your learning journey."),
-        ("🎤", "Voice & Pronunciation", "Speech-to-text via Whisper, text-to-speech, and romanisation for all 5 languages (Pinyin, Jyutping, Hangul, Hepburn, IPA)."),
+        (
+            "🎯",
+            "AI Chat Coach",
+            "Region-aware reply suggestions with tone analysis, cultural notes, and pronunciation guides across 5 regional modes.",
+        ),
+        (
+            "🌐",
+            "Translation",
+            "Context-aware AI translation with native-language explanations for the user's target language.",
+        ),
+        (
+            "✍️",
+            "Grammar & Natural Expression",
+            "Level-based grammar correction and natural expression rewriting — turn textbook language into natural conversation.",
+        ),
+        (
+            "📚",
+            "Vocabulary & Review",
+            "Save phrases to a personal vocab bank, review saved corrections, and track your learning progress over time.",
+        ),
+        (
+            "📊",
+            "Learning Report",
+            "Points, streak tracking, weekly charts, and mode analytics to visualise your learning journey.",
+        ),
+        (
+            "🎤",
+            "Voice & Pronunciation",
+            "Speech-to-text via Whisper, text-to-speech, and romanisation for all 5 languages (Pinyin, Jyutping, Hangul, Hepburn, IPA).",
+        ),
     ]
 
     for i in range(0, len(features), 2):
@@ -2842,7 +2870,11 @@ def render_about_page():
         ("🐍", "Python 3.11+", "Core application logic and AI orchestration"),
         ("📡", "Streamlit", "Rapid AI UX prototyping with built-in state management"),
         ("🗄️", "PostgreSQL + Supabase", "Persistent data storage with zero-infrastructure local fallback (SQLite)"),
-        ("🤖", "OpenAI / Anthropic / DeepSeek", "Multi-provider AI with automatic fallback for supported text AI tasks"),
+        (
+            "🤖",
+            "OpenAI / Anthropic / DeepSeek",
+            "Multi-provider AI with automatic fallback for supported text AI tasks",
+        ),
     ]
     for i in range(0, len(tech_data), 2):
         row_cols = st.columns(2)
@@ -2942,7 +2974,7 @@ def render_about_page():
 
     # ── Footer ──
     st.markdown(
-        f"""
+        """
         <div style="text-align:center;padding:1.5rem 0;color:#9ca3af;font-size:0.85rem;">
             <div style="font-weight:700;color:#374151;font-size:1rem;margin-bottom:0.4rem;">🌐 TriLingua Bridge</div>
             <div style="margin-bottom:0.6rem;">

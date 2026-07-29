@@ -74,7 +74,7 @@ def _get_pg_config() -> dict:
 
 
 def _use_postgres() -> bool:
-    """Check whether to use PostgreSQL (Supabase) instead of SQLite.
+    """Check whether to use persistent PostgreSQL instead of local SQLite.
 
     Reads from environment variables or Streamlit secrets.
     Accepts true, True, TRUE, etc. Defaults to false.
@@ -124,7 +124,8 @@ def get_connection():
 
     PostgreSQL (USE_POSTGRES=true):
         Returns a psycopg2 connection with RealDictCursor.
-        Configuration via DATABASE_URL (preferred) or the SUPABASE_DB_* fields.
+        Configuration via a pooled Neon DATABASE_URL (preferred), with legacy
+        split PostgreSQL fields retained for compatibility.
 
     SQLite (default):
         Returns a sqlite3 connection with Row factory.
